@@ -176,6 +176,14 @@ class Collect(unittest.TestCase):
         with self.assertRaises(ValueError):
             collect.collect_chunks(latents, plan, lambda video: decode_video(video, missing=17), decode_audio_factory(sizes))
 
+    def test_off_grid_chunk_length_is_named_not_a_format_crash(self):
+        # 2026-11-07: a chunk planned off the step grid made steps_for_frames return None and the %d message raised TypeError.
+        latents = module("ng.adapters.latents")
+        with self.assertRaisesRegex(ValueError, r"Chunk 1 is planned at 7 frames.*has 2 video / 12 audio steps"):
+            latents.validate_chunk(fake_latent(7, 0), 7, "Chunk 1")
+        with self.assertRaisesRegex(ValueError, r"needs the full 22-frame AV latent \(7 video / 37 audio steps\) but got 2 video"):
+            latents.validate_chunk(fake_latent(5, 0), 22, "Chunk 1")
+
 
 
 @unittest.skipUnless(HAVE_COMFY, "ComfyUI is not importable")
