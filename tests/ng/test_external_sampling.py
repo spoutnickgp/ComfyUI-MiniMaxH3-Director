@@ -52,6 +52,15 @@ class ExternalSampling(unittest.TestCase):
         self.assertIsNone(director.expand)
         self.assertTrue(self.nodes["NGH3Director"].GET_SCHEMA().outputs[1].is_output_list)
 
+    def test_chunk_info_gives_each_chunk_its_own_plan_values(self):
+        jobs = self.jobs(self.result())
+        info = [self.nodes["NGChunkInfo"].execute(chunk=job).args for job in jobs]
+        self.assertEqual([i[:2] for i in info], [("video", False)] * 3)
+        self.assertEqual([i[2:4] for i in info], [("fl2va", False)] * 3, "a text-only project samples every chunk with fl2va")
+        self.assertEqual([i[4:7] for i in info], [(0, True, False), (1, False, False), (2, False, True)])
+        self.assertEqual([i[7:] for i in info], [(job.chunk.sampled_frames, job.chunk.head_frames) for job in jobs])
+        self.assertEqual(self.nodes["NGChunkInfo"].execute(chunk=[jobs[1]]).args[4], 1, "the loop may wrap the item in a list")
+
     def test_the_directors_sampling_settings_reach_an_external_sampler(self):
         """User request: steps, sampler and scheduler from the Director at the Output, for an external KSampler."""
         from comfy.samplers import KSampler
