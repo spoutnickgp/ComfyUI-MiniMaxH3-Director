@@ -18,10 +18,16 @@ def validate_chunk(latent, sampled_frames, label):
     if video.ndim != 5 or audio.ndim != 4 or video.shape[:2] != (1, 24) or audio.shape[:3] != (1, 32, 2):
         raise ValueError("%s must be one H3 AV latent: video [1,24,T,H,W] and audio [1,32,2,A]." % label)
     expected_video = pin.steps_for_frames(sampled_frames)
+    if expected_video is None:
+        # The plan's length, not the latent, is wrong here: no whole number of video steps covers it.
+        raise ValueError("%s is planned at %d frames, which no whole number of H3 video latent steps covers; the chunks do not come from one "
+                         "unmodified Director plan. The latent has %d video / %d audio steps."
+                         % (label, sampled_frames, video.shape[2], audio.shape[-1]))
     expected_audio = round(sampled_frames / float(FPS) * AUDIO_HZ)
     if video.shape[2] != expected_video or audio.shape[-1] != expected_audio:
-        raise ValueError("%s needs the full %d-frame AV latent (%d video / %d audio steps); return the final sampler result before trimming or decoding."
-                         % (label, sampled_frames, expected_video, expected_audio))
+        raise ValueError("%s needs the full %d-frame AV latent (%d video / %d audio steps) but got %d video / %d audio steps; "
+                         "return the final sampler result before trimming or decoding."
+                         % (label, sampled_frames, expected_video, expected_audio, video.shape[2], audio.shape[-1]))
     return video, audio
 
 
