@@ -180,6 +180,29 @@ def effect_name(value):
     return name if _EFFECT.match(name) else ""
 
 
+@dataclass(frozen=True)
+class ShotLora:
+    """A LoRA a shot switches on: every render part that samples new frames of the shot carries it (core/shot_loras.py)."""
+    name: str               # the file as ComfyUI lists models/loras ("style/ink.safetensors")
+    strength: float = 1.0
+    SCHEMA_VERSION = 1
+
+    def to_dict(self):
+        return {"schema_version": self.SCHEMA_VERSION, "name": self.name, "strength": self.strength}
+
+    @classmethod
+    def from_dict(cls, data, path="lora"):
+        fields.need_dict(data, path)
+        fields.check_version(data, path, cls.SCHEMA_VERSION)
+        name = fields.read_str(data, "name", path).strip()
+        if not name:
+            raise SchemaError(path + ".name", "must name a LoRA file")
+        strength = float(fields.read_number(data, "strength", path, 1.0))
+        if not -10.0 <= strength <= 10.0:
+            raise SchemaError(path + ".strength", "must be between -10 and 10, got %r" % strength)
+        return cls(name, strength)
+
+
 def metadata(record, path="shot"):
     media = tuple(MediaBinding.from_dict(b, "%s.media[%d]" % (path, i))
                   for i, b in enumerate(fields.read_list(record, "media", path)))
@@ -188,7 +211,9 @@ def metadata(record, path="shot"):
     locks = fields.read_texts(record, "locked_fields", path)
     if any(value not in LOCK_FIELDS for value in locks):
         raise SchemaError(path + ".locked_fields", "expected timing, text, media or spoken")
-    return {"id": record["id"], "media": media, "spoken": spoken, "locked_fields": locks, "effect": effect_name(record.get("effect"))}
+    loras = tuple(ShotLora.from_dict(l, "%s.loras[%d]" % (path, i)) for i, l in enumerate(fields.read_list(record, "loras", path)))
+    return {"id": record["id"], "media": media, "spoken": spoken, "locked_fields": locks, "effect": effect_name(record.get("effect")),
+            "loras": loras}
 
 
 def bound_media_ids(text):

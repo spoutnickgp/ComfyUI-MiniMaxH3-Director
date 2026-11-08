@@ -12,7 +12,7 @@ from dataclasses import dataclass, replace
 from . import fields, frames, limits
 from .boundaries import align_to_shots
 from .issues import Issue, SchemaError
-from .shot_document import MediaBinding, SpokenLine
+from .shot_document import MediaBinding, ShotLora, SpokenLine
 
 CONTINUITY_MODES = ("none", "video", "video_audio")
 
@@ -65,14 +65,20 @@ class ChunkShot:
     shot_start_f: int = -1  # the whole shot on the story timeline; -1 = unknown (data from before 2026-10-13)
     shot_end_f: int = -1
     effect: str = ""
+    loras: tuple = ()
     SCHEMA_VERSION = 1
 
     def to_dict(self):
-        return {"schema_version": self.SCHEMA_VERSION, "shot_index": self.shot_index, "local_start_f": self.local_start_f,
+        data = {"schema_version": self.SCHEMA_VERSION, "shot_index": self.shot_index, "local_start_f": self.local_start_f,
                 "local_end_f": self.local_end_f, "text": self.text, "carried": self.carried, "continues": self.continues,
                 "shot_id": self.shot_id, "media": [b.to_dict() for b in self.media],
                 "spoken": [s.to_dict() for s in self.spoken], "locked_fields": list(self.locked_fields),
                 "shot_start_f": self.shot_start_f, "shot_end_f": self.shot_end_f, "effect": self.effect}
+        # Only when set: this dict is part of every render part's resume key (adapters/resume.py), and an empty list
+        # on every shot would have thrown away all parts rendered before LoRAs existed.
+        if self.loras:
+            data["loras"] = [l.to_dict() for l in self.loras]
+        return data
 
     @classmethod
     def from_dict(cls, data, path="chunk_shot"):
@@ -86,7 +92,8 @@ class ChunkShot:
                    spoken=tuple(SpokenLine.from_dict(s) for s in fields.read_list(data, "spoken", path)),
                    locked_fields=fields.read_texts(data, "locked_fields", path),
                    shot_start_f=int(data.get("shot_start_f", -1)), shot_end_f=int(data.get("shot_end_f", -1)),
-                   effect=str(data.get("effect", "")))
+                   effect=str(data.get("effect", "")),
+                   loras=tuple(ShotLora.from_dict(l, "%s.loras[%d]" % (path, i)) for i, l in enumerate(fields.read_list(data, "loras", path))))
 
 
 @dataclass(frozen=True)
@@ -207,7 +214,7 @@ def _shots_for_chunk(shots, story_start, story_end, head, external=False):
                              local_end_f=min(shot.end_f, story_end) - sample_start, text=shot.text,
                              carried=shot.start_f < story_start, continues=shot.end_f > story_end,
                              shot_id=shot.id, media=shot.media, spoken=shot.spoken, locked_fields=shot.locked_fields,
-                             shot_start_f=shot.start_f, shot_end_f=shot.end_f, effect=shot.effect))
+                             shot_start_f=shot.start_f, shot_end_f=shot.end_f, effect=shot.effect, loras=shot.loras))
     return tuple(out)
 
 

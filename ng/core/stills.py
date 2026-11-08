@@ -88,7 +88,7 @@ def _chunk(index, shot, last):
     length = max(shot.end_f - shot.start_f, MIN_FRAMES)
     piece = ChunkShot(shot_index=shot.index, local_start_f=0, local_end_f=length, text=shot.text, carried=False,
                       continues=False, shot_id=shot.id, media=shot.media, spoken=(), locked_fields=shot.locked_fields,
-                      shot_start_f=shot.start_f, shot_end_f=shot.start_f + length)
+                      shot_start_f=shot.start_f, shot_end_f=shot.start_f + length, loras=shot.loras)
     return Chunk(index=index, story_start_f=shot.start_f, delivered_frames=length, head_frames=0, shots=(piece,), is_last=last)
 
 
