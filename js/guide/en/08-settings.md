@@ -61,6 +61,7 @@ Every field of the H3 Director in one place, from top to bottom. How to work wit
 | **Place** | *Its own place* or *Like Shot N* (reuse an earlier shot's place) |
 | **Picture** | for *Like Shot N*: *Without people*, *As rendered (1 s in)* or *From another view …* with a camera text |
 | **Effect** | an official H3 camera effect such as *Bullet time* (only when its files are installed) |
+| **LoRAs** | LoRAs from `models/loras`, each with a strength, switched on in every render part that renders the shot (also for the frames of a neighbouring shot in the same part); trigger words go into the shot's text |
 | **+ Spoken line** | a line said word for word: speaker (or *Narrator*), language, delivery (*says*, *sings*, *whispers*, *shouts*, *murmurs*), text |
 | **In:** | the render parts the shot lies in |
 

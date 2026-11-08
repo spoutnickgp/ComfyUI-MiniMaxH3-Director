@@ -8,7 +8,7 @@ import folder_paths
 from comfy_api.latest import InputImpl, io
 
 from ...minimax_core import audio_nodes, core
-from ..adapters import audio_locks, chunk_builder, collect, continuation_join, latents, resume
+from ..adapters import audio_locks, chunk_builder, collect, continuation_join, latents, resume, shot_loras
 from ..adapters.media import MediaError
 from ..core.limits import FPS, RESIZE_METHODS
 from .context_nodes import CATEGORY
@@ -90,6 +90,8 @@ class NGChunkConditioning(io.ComfyNode):
         if apply_sigma_shift:
             shifted = mm.MiniMaxH3SigmaShift.execute(model=model, shift_video=float(shift_video), shift_audio=float(shift_audio))
             model = getattr(shifted, "args", shifted)[0]
+        # every render path (Render Sequence, Director Output, an own loop) picks its part's model here, so the shots' LoRAs go on here too
+        model = shot_loras.apply(model, job)
         model = audio_locks.bind_source(model, job, audio_vae)
         return io.NodeOutput(model, built.positive, built.latent, job.compiled.prompt)
 
