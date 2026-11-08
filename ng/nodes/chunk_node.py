@@ -8,7 +8,7 @@ import folder_paths
 from comfy_api.latest import InputImpl, io
 
 from ...minimax_core import audio_nodes, core
-from ..adapters import audio_locks, chunk_builder, collect, continuation_join, latents, resume
+from ..adapters import audio_locks, chunk_builder, collect, continuation_join, latents, resume, shot_loras
 from ..adapters.media import MediaError
 from ..core.limits import FPS, RESIZE_METHODS
 from .context_nodes import CATEGORY
@@ -28,6 +28,33 @@ class _Unconnected:
 
 
 UNCONNECTED = _Unconnected()
+
+
+class NGChunkInfo(io.ComfyNode):
+    """What the plan says about one chunk, as plain values a switch can branch on. Read-only: nothing is built or loaded."""
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id="NGChunkInfo", display_name="NG Chunk Info", category=CATEGORY + "/Custom loop",
+            description="Inside the loop: the current chunk's output (video or pictures), its model (fl2va or ref2va), its place "
+                        "in the sequence and its planned length. The mode can change from chunk to chunk; branch on it per iteration.",
+            inputs=[NGChunk.Input("chunk", tooltip="The loop's list_item.")],
+            outputs=[io.String.Output(display_name="output", tooltip="video or images: the same for every chunk of a project."),
+                     io.Boolean.Output(display_name="is_pictures", tooltip="True when the Director makes pictures (NG Still Latent / NG Still Collect)."),
+                     io.String.Output(display_name="mode", tooltip="fl2va (First / last frame model) or ref2va (References model), for this chunk."),
+                     io.Boolean.Output(display_name="uses_references", tooltip="True when this chunk needs the References model (model_ref2va)."),
+                     io.Int.Output(display_name="index", tooltip="0-based position of this chunk."),
+                     io.Boolean.Output(display_name="is_first"), io.Boolean.Output(display_name="is_last"),
+                     io.Int.Output(display_name="sampled_frames", tooltip="Frames sampled for this chunk, the pinned head included."),
+                     io.Int.Output(display_name="head_frames", tooltip="Frames pinned from the previous chunk; 0 for the first or an unpinned chunk.")],
+        )
+
+    @classmethod
+    def execute(cls, chunk):
+        job = _job(chunk)
+        planned, mode, output = job.chunk, job.compiled.mode, job.project.output
+        return io.NodeOutput(output, output == "images", mode, mode == "ref2va", job.index, job.index == 0,
+                             job.index == len(job.project.plan.chunks) - 1, planned.sampled_frames, planned.head_frames)
 
 
 class NGChunkConditioning(io.ComfyNode):
@@ -90,6 +117,8 @@ class NGChunkConditioning(io.ComfyNode):
         if apply_sigma_shift:
             shifted = mm.MiniMaxH3SigmaShift.execute(model=model, shift_video=float(shift_video), shift_audio=float(shift_audio))
             model = getattr(shifted, "args", shifted)[0]
+        # every render path (Render Sequence, Director Output, an own loop) picks its part's model here, so the shots' LoRAs go on here too
+        model = shot_loras.apply(model, job)
         model = audio_locks.bind_source(model, job, audio_vae)
         return io.NodeOutput(model, built.positive, built.latent, job.compiled.prompt)
 
@@ -169,4 +198,4 @@ def _decode_video(vae, video):
     return frames.reshape(-1, *frames.shape[-3:]) if frames.ndim == 5 else frames
 
 
-NODES = [NGChunkConditioning, NGCollect, NGCollectVideo]
+NODES = [NGChunkInfo, NGChunkConditioning, NGCollect, NGCollectVideo]

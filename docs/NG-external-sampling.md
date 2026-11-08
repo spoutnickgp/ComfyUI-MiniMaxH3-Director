@@ -33,6 +33,11 @@ CFGGuider explicitly uses CFG 1. The base examples use 20 steps; the recorded pi
    straight into an H.264/AAC file and connects directly to SaveVideo. NG Collect holds every frame at once (177 s at
    768×1152 are 4248 frames, 45 GB in float32), which does not fit in memory.
 
+**Branching on the plan:** NG Chunk Info takes the loop's `list_item` and returns the chunk's `output` (`video` /
+`images`, with `is_pictures`), its `mode` (`fl2va` / `ref2va`, with `uses_references`), `index`, `is_first`, `is_last`,
+`sampled_frames` and `head_frames`. The mode is planned per chunk, so a project can mix both models: branch on it inside
+the loop, once per iteration, and use a lazy switch so the branch not taken (and its model) is never evaluated.
+
 One Output prepares each current chunk; H3 Prepare Chunk has been removed. Its original nine outputs retain their slots.
 Keep Output's sampler values and seed inside the loop. Sending an Output value directly past End Loop creates a native loop escape;
 ComfyUI then refuses the run with "Invalid input: loop boundary" on Start Loop, End Loop and the node outside

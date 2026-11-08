@@ -11,7 +11,7 @@ import { timeView } from "./h3s_time.js";
 import { timelineEditor } from "./h3s_edits.js";
 import { bindTimelineKeys } from "./h3s_keys.js";
 import { updateStudioPage } from "./h3s_focus.js";
-import { sideView, loadEffects } from "./h3s_side.js";
+import { sideView, loadEffects, loadLoras } from "./h3s_side.js";
 import { footerView } from "./h3s_footer.js";
 import { settingsView, manualPromptAlert, loadModels } from "./h3s_settings.js";
 import { drawerView } from "./h3s_prompts.js";
@@ -65,7 +65,7 @@ export function openStudio(node, app, api, host = null) {
   const status = h("span", { class: "h3s-lbl" });
   const progress = attachProgress(node, api, status, () => projectRenderIds(node));
   const ai = studioAI(S, app, api, () => render());
-  profilesLoaded.then(() => { if (!closed) { S.turboProfiles = turboProfiles; render(); } }); loadModels(api).then((state) => { if (!closed) { S.models = state; render(); } }); loadEffects(api).then((names) => { if (!closed) { S.effects = names; render(); } });
+  profilesLoaded.then(() => { if (!closed) { S.turboProfiles = turboProfiles; render(); } }); loadModels(api).then((state) => { if (!closed) { S.models = state; render(); } }); loadEffects(api).then((names) => { if (!closed) { S.effects = names; render(); } }); loadLoras(api).then((names) => { if (!closed) { S.loras = names; render(); } });
 
   let echo = false;
   function write(changes) { echo = true; try { applyValues(node, changes); } finally { echo = false; } }

@@ -150,6 +150,36 @@ function effectField(S, actions, shot) {
     select(options, shot.effect || "", (value) => actions.setShot(shot.id, { effect: value || undefined }), { "aria-label": "Effect of this shot" }));
 }
 
+// LoRAs from models/loras that this shot switches on (core/shot_loras.py): a render part samples all its frames in one run,
+// so a LoRA is on in every render part that samples this shot, including the frames of its neighbours in that part.
+const LORA_HINT = "On in every render part that renders this shot. A part that also covers the shot before or after it uses the LoRA there too; "
+  + "a LoRA on several shots of one part is used once, at its strongest strength. Trigger words go into the shot's text.";
+export const loadLoras = (api) => api.fetchApi("/models/loras").then((response) => response.json())
+  .then((names) => (Array.isArray(names) ? names : []).sort()).catch(() => []);
+
+function loraField(S, actions, shot) {
+  const names = S.loras || [], loras = Array.isArray(shot.loras) ? shot.loras : [];
+  if (!names.length && !loras.length) return null;
+  const put = (list) => actions.setShot(shot.id, { loras: list.length ? list : undefined });
+  const row = (lora, index) => {
+    const options = names.map((name) => [name, name]);
+    if (!names.includes(lora.name)) options.push([lora.name, `${lora.name} (file missing)`]);
+    return h("div", { class: "h3s-row" },
+      h("span", { class: "h3s-grow" }, select(options, lora.name, (value) => put(loras.map((l, i) => (i === index ? { ...l, name: value } : l))),
+        { "aria-label": "LoRA file" })),
+      h("input", { class: "h3s-in", type: "number", step: "0.05", min: "-10", max: "10", value: lora.strength ?? 1, style: { width: "72px" },
+        "aria-label": "LoRA strength", title: "Strength",
+        onchange: (event) => { const value = Number(event.target.value); if (Number.isFinite(value)) put(loras.map((l, i) => (i === index ? { ...l, strength: value } : l))); } }),
+      h("button", { class: "h3s-btn ghost small", title: "Remove LoRA", "aria-label": "Remove LoRA", onclick: () => put(loras.filter((_, i) => i !== index)) }, icon("trash", 14)));
+  };
+  const free = names.find((name) => !loras.some((l) => l.name === name));
+  return h("div", { style: { display: "flex", flexDirection: "column", gap: "6px" } },
+    h("div", { class: "h3s-row" }, h("span", { class: "h3s-lbl" }, "LoRAs"), tip(LORA_HINT)),
+    loras.map(row),
+    free ? h("button", { class: "h3s-btn small", style: { alignSelf: "flex-start" }, onclick: () => put([...loras, { schema_version: 1, name: free, strength: 1 }]) },
+      icon("plus", 14), "LoRA") : null);
+}
+
 function shotPanel(S, actions, shot) {
   const add = h("button", { class: "h3s-btn small", onclick: () => actions.addSpoken(shot.id) }, icon("plus", 14), "Spoken line");
   const addBox = h("span", { style: { alignSelf: "flex-start" } });
@@ -181,6 +211,7 @@ function shotPanel(S, actions, shot) {
       media.map(([binding, entry]) => bindingRow(S, actions, shot, binding, entry))),
     placeField(S, actions, shot),
     effectField(S, actions, shot),
+    loraField(S, actions, shot),
     h("div", { style: { display: "flex", flexDirection: "column", gap: "8px" } }, h("span", { class: "h3s-lbl" }, "Spoken (optional, used word for word, in this order)"),
       spokenLines(S, actions, shot, showAdd),
       S.values.mode === "fl2va" ? h("span", { class: "h3s-lbl" }, "First / last frame mode does not use voice references. Reference pictures still guide appearance; "

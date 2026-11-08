@@ -31,6 +31,7 @@ class Shot:
     spoken: tuple = ()
     locked_fields: tuple = ()
     effect: str = ""            # an effect embedding added to the shot's text where it starts (shot_document.effect_name)
+    loras: tuple = ()           # shot_document.ShotLora: on in every render part that samples this shot (core/shot_loras.py)
 
     @property
     def frames(self):
