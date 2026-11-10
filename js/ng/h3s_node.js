@@ -8,7 +8,7 @@ import { values, applyValues, followNodeWidth } from "./ng_widgets.js";
 import { readContexts } from "./ng_read.js";
 import { renameReferences } from "./ng_references.js";
 import { hideNative } from "./ng_editor_fields.js";
-import { noteGrowth, followDraggedHeight, pushOnGrowth } from "./ng_layout.js";
+import { followDraggedHeight } from "./ng_layout.js";
 
 const { app } = window.comfyAPI.app;
 const { api } = window.comfyAPI.api;
@@ -101,7 +101,6 @@ function attach(node) {
   watcher?.observe(studio.root);
   // dragged taller, the timeline's shot lane takes the extra height and its shots show more of their text
   followDraggedHeight(node, (px) => { host.style.setProperty("--h3s-grow", `${px}px`); host.style.setProperty("--h3s-lines", String(2 + Math.floor(px / 16))); }, fit);
-  pushOnGrowth(node);
   // The Studio writes the widgets itself and hears outside changes on its own; the node keeps @Name mentions in step.
   const follow = () => followRenames(node);
   const refresh = () => { followRenames(node); studio.refresh(); fit(); };
@@ -118,8 +117,8 @@ function attach(node) {
     for (const key of ["ng_view_mode", "ng_selected_shot_id"]) delete node.properties[key];
     repairInsertedWidgets(node, args[0]?.widgets_values, args[0]?.widgets_values_named);
     repairLaterWidgets(node);
-    // Saved by the former compact node: the Studio needs the room once, and the nodes around it move along.
-    if (node.size?.[0] < MIN_WIDTH) { noteGrowth(node, [...node.size]); node.setSize([WIDTH, Math.max(node.size[1], HEIGHT)]); }
+    // Saved by the former compact node: the Studio grows once.
+    if (node.size?.[0] < MIN_WIDTH) node.setSize([WIDTH, Math.max(node.size[1], HEIGHT)]);
     refresh(); return result;
   };
   const gone = node.onRemoved;

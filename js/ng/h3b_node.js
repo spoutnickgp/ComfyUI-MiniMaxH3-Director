@@ -3,7 +3,7 @@
 import { h } from "./h3s_dom.js";
 import { ensureStudioStyle } from "./h3s_style.js";
 import { ensureBoardStyle } from "./h3b_style.js";
-import { draggedByUser, pushOnGrowth } from "./ng_layout.js";
+import { draggedByUser } from "./ng_layout.js";
 import { openBoard } from "./h3b_editor.js";
 import { followNodeWidth } from "./ng_widgets.js";
 import { hideNative } from "./ng_editor_fields.js";
@@ -69,7 +69,6 @@ function attach(node) {
   const gone = node.onRemoved;
   node.onRemoved = function (...args) { removed = true; watcher?.disconnect(); editor.dispose(); return gone?.apply(this, args); };
   node.setSize([WIDTH, measured]);
-  pushOnGrowth(node);
 }
 
 app.registerExtension({

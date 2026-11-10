@@ -35,8 +35,9 @@ The Director node **is** the Studio: the whole Studio described below is the nod
 its content. The Studio writes the node's own widgets, so ComfyUI's unsaved-changes marker and Save/Reload include every edit.
 Keys pressed inside it stay there (Delete on one of its buttons does not delete the node); Ctrl/Cmd shortcuts still reach ComfyUI.
 
-A Director saved by the former compact node (440 px wide) grows once when the workflow is loaded, and the nodes to the right
-of it and below it move along so nothing overlaps; the same happens for Context nodes saved before they became full cards.
+A Director saved by the former compact node (440 px wide) grows once when the workflow is loaded; so do Context nodes saved
+before they became full cards. NG nodes never move other nodes: one that grows may cover what lies below or right of it,
+as any ComfyUI node may, so keep the space below the Director free.
 
 ## The Studio
 

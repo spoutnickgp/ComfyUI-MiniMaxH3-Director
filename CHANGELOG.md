@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- **Nodes no longer move other nodes.** A Director, card, Storyboard or product node that grew pushed the nodes below
+  and to the right of it, and never moved them back: after Send to Director or a run, the Storyboard under the Director
+  ended up far below. A growing node may now cover its neighbours, as any ComfyUI node may; old compact nodes still grow
+  once on load, without moving anything.
+- **Cut out no longer touches the graph's nodes 1 to 6.** Its job used the ids "1" to "6", so ComfyUI showed the job's
+  progress and picture on the workflow's own nodes with those ids.
+
 ## 1.0.1 (2026-11-03)
 
 - **Example files are copied when you open an example, not on start** (#35). Opening an example workflow copies the
