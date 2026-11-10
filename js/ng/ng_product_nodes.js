@@ -7,7 +7,6 @@ import { providerRestoreValues, configureProviderType, restoreProviderFields } f
 import { attachProgress } from "./ng_studio_progress.js";
 import { compactContextInputs } from "./ng_connector_slots.js";
 import { icon } from "./ng_icons.js";
-import { pushOnGrowth } from "./ng_layout.js";
 import { buildPanel } from "./ng_ai_panel.js";
 
 const { app } = window.comfyAPI.app, { api } = window.comfyAPI.api;
@@ -103,7 +102,6 @@ app.registerExtension({name:"mmxd.ng.product_nodes",beforeRegisterNodeDef(nodeTy
 },nodeCreated(node){
   ({NGAIProvider:provider,NGContextConnector:connector,NGDirectorOutput:output,NGProjectRender:render})[node.comfyClass]?.(node);
   if(["NGAIProvider","NGContextConnector","NGDirectorOutput","NGProjectRender"].includes(node.comfyClass)){
-    pushOnGrowth(node);
     const changed=node.onConnectionsChange;node.onConnectionsChange=function(...args){const result=changed?.apply(this,args);
       document.dispatchEvent(new CustomEvent("ng-context-changed"));return result;};
   }

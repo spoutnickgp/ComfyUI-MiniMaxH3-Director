@@ -20,7 +20,7 @@ import { FAMILY } from "./ng_context.js";
 import { assetChoices, assetSubjects, restoreAssetWidget } from "./ng_asset_relations.js";
 import { subjectChoices } from "./ng_subjects.js";
 import { followNoteRenames, knownNames } from "./ng_references.js";
-import { noteGrowth, followDraggedHeight, pushOnGrowth } from "./ng_layout.js";
+import { followDraggedHeight } from "./ng_layout.js";
 import { dropTarget } from "./ng_drop.js";
 import { controlBox } from "./h3c_control.js";
 import { controlGraph, controlSetup } from "./h3c_control_graph.js";
@@ -340,7 +340,6 @@ function attach(node, media) {
   watcher?.observe(root);
   // dragged taller, the preview (Image, Video), the waveform (Audio) or the note (Text) takes the extra height
   followDraggedHeight(node, (px) => root.style.setProperty("--h3c-grow", `${px}px`), fit);
-  pushOnGrowth(node);
 
   const names = () => (node.widgets || []).filter((widget) => widget !== dom).map((widget) => widget.name);
   const dom = followNodeWidth(node.addDOMWidget("h3c_card", "h3c_card", root, { serialize: false, hideOnZoom: false }));
@@ -371,8 +370,8 @@ function attach(node, media) {
     if (identity() && !identity().value) identity().value = newContextId();
     assignColor(); delete node.properties.ng_context_expanded;
     queueMicrotask(() => { if (!removed) keepOwnIdentity(); });
-    // Saved by the former, narrower Context node: the card needs the room once, and the nodes around it move along.
-    if (node.size?.[0] < WIDTH[media] - 20) { noteGrowth(node, [...node.size]); node.setSize([WIDTH[media], Math.max(node.size[1], measured)]); }
+    // Saved by the former, narrower Context node: the card grows once.
+    if (node.size?.[0] < WIDTH[media] - 20) node.setSize([WIDTH[media], Math.max(node.size[1], measured)]);
     S.presetName = node.properties.ng_preset_name || ""; S.listen = node.properties.ng_preview_settings ||= { volume: 1, fade_in: 0, fade_out: 0 };
     schedule(); return result;
   };

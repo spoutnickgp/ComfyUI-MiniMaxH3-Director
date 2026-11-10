@@ -14,18 +14,19 @@ export function boardJobs({ S, node, app, api, pictures, change, render, flash, 
     const state = await modelState(api, ["background_removal"]);
     const model = resolveModel(state, "background_removal", node.properties.ng_models?.background_removal);
     if (!model) { flash(missingText(state.background_removal), true); return; }
+    // Letter ids, as in qwenGraph: ComfyUI shows a job's progress and pictures on the graph node with the same id.
     const prompt = {
-      "1": { class_type: "LoadImage", inputs: { image: loadName(item.src) } },
-      "2": { class_type: "LoadBackgroundRemovalModel", inputs: { bg_removal_name: model } },
-      "3": { class_type: "RemoveBackground", inputs: { bg_removal_model: ["2", 0], image: ["1", 0] } },
+      "i": { class_type: "LoadImage", inputs: { image: loadName(item.src) } },
+      "m": { class_type: "LoadBackgroundRemovalModel", inputs: { bg_removal_name: model } },
+      "r": { class_type: "RemoveBackground", inputs: { bg_removal_model: ["m", 0], image: ["i", 0] } },
       // JoinImageWithAlpha keeps where its mask is 0 (LoadImage's convention), so the foreground mask is inverted first.
-      "4": { class_type: "InvertMask", inputs: { mask: ["3", 0] } },
-      "5": { class_type: "JoinImageWithAlpha", inputs: { image: ["1", 0], alpha: ["4", 0] } },
-      "6": { class_type: "SaveImage", inputs: { images: ["5", 0], filename_prefix: `${SUBFOLDER}/cutout` } },
+      "n": { class_type: "InvertMask", inputs: { mask: ["r", 0] } },
+      "j": { class_type: "JoinImageWithAlpha", inputs: { image: ["i", 0], alpha: ["n", 0] } },
+      "s": { class_type: "SaveImage", inputs: { images: ["j", 0], filename_prefix: `${SUBFOLDER}/cutout` } },
     };
     S.busy = "cutout"; render();
     try {
-      const src = await runJob(api, prompt, "6", 300);
+      const src = await runJob(api, prompt, "s", 300);
       change((board) => {
         const target = board.panels.flatMap((p) => p.layers).find((l) => l.id === item.id);
         if (target) { target.src = src; target.name = `${item.name || "Picture"} (cut out)`; }

@@ -33,56 +33,6 @@ assert.ok(!stopped && studio.root.parentNode === host, "in the graph Esc is left
 
 closeStudio(f.node);
 assert.equal(host.children.length, 0, "removing the node removes its Studio");
-// Nodes saved at the former, smaller size grow once; what lies right of or below them moves along, the rest stays.
-{
-  const { makeRoom } = await import("../../../js/ng/ng_layout.js");
-  const at = (x, y, w = 200, h = 100) => ({ pos: [x, y], size: [w, h] });
-  const director = at(0, 0, 1400, 1150), right = at(500, 0), below = at(0, 600), left = at(-400, 0), farBelow = at(2000, 900);
-  const around = { pos: [-50, -50], size: [1000, 800] }, aside = { pos: [600, 0], size: [300, 300] };
-  makeRoom({ _nodes: [director, right, below, left, farBelow], _groups: [around, aside] }, [[director, [440, 470]]]);
-  assert.deepEqual(right.pos, [1460, 0], "right of the old node: moves right by the growth");
-  assert.deepEqual(below.pos, [0, 1280], "under the node: moves down");
-  assert.deepEqual(left.pos, [-400, 0], "left of it: stays");
-  assert.deepEqual(farBelow.pos, [2960, 900], "right of it, even lower: moves right only");
-  assert.deepEqual(around.size, [1960, 1480], "a group around the node grows with it");
-  assert.deepEqual(aside.pos, [1560, 0]);
-  // Two cards in one column (text over image), then the Connector and the Director: the column moves things once.
-  const text = at(-1560, 40, 870, 758), image = at(-1560, 470, 750, 829), connector = at(-1140, 40, 560, 400), next = at(-740, 40, 1400, 1150);
-  makeRoom({ _nodes: [text, image, connector, next] }, [[text, [400, 390]], [image, [400, 600]], [next, [440, 470]]]);
-  assert.deepEqual(connector.pos, [-670, 40], "moved once by the widest card of the column");
-  assert.deepEqual(next.pos, [-270, 40]);
-  assert.deepEqual(image.pos, [-1560, 838], "the lower card moves below the grown upper one");
-  assert.ok(text.pos[0] + text.size[0] <= connector.pos[0], "the grown cards end before the Connector");
-}
-// A card that grows by its content (a picture chosen) moves the node below it; a load and a drag by the user move nothing.
-{
-  const { pushOnGrowth } = await import("../../../js/ng/ng_layout.js");
-  const saved = globalThis.comfyAPI;
-  const canvas = { resizing_node: null, pointer: {} };
-  globalThis.comfyAPI = { app: { app: { canvas } } };
-  const below = { pos: [0, 900], size: [660, 400] };
-  const card = { pos: [0, 0], size: [660, 800], setSize(size) { this.size = size; this.onResize?.(size); } };
-  card.graph = { _nodes: [card, below], _groups: [] };
-  pushOnGrowth(card);
-  card.onConfigure();
-  card.setSize([660, 800]);
-  card.setSize([660, 1100]);
-  assert.deepEqual(below.pos, [0, 1200], "moved down by the growth");
-  canvas.resizing_node = card;
-  card.setSize([660, 1400]);
-  assert.deepEqual(below.pos, [0, 1200], "the user's own drag moves nothing");
-  // a height that wobbles by a few pixels once pushed the nodes below on every upward step (issue #37)
-  canvas.resizing_node = null;
-  below.pos = [0, 1500];
-  for (const height of [1397, 1400, 1396, 1400, 1397, 1400]) card.setSize([660, height]);
-  assert.deepEqual(below.pos, [0, 1500], "a wobbling height moves nothing");
-  card.setSize([660, 1000]);
-  card.setSize([660, 1300]);
-  assert.deepEqual(below.pos, [0, 1500], "growing back to a height it had moves nothing");
-  card.setSize([660, 1450]);
-  assert.deepEqual(below.pos, [0, 1550], "only growth beyond the largest height so far pushes");
-  globalThis.comfyAPI = saved;
-}
 // A split sends the user's own dialogue along: inline lines and spoken lines, by the speaker's name.
 {
   const { ownLines } = await import("../../../js/ng/h3s_ai.js");
