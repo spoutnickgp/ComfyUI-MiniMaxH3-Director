@@ -212,6 +212,30 @@ const model = await import("../../../js/ng/h3b_model.js");
   assert.ok(shots.slice(-2).every((s, i) => s.id.endsWith(`-${scene3.panels[i].id}`)));
 }
 
+// The Studio keeps shots in the order they were made ("+ Shot" adds at the end, a move only changes times), so a resend
+// goes by time: only shots after the scene move, by its change of length, and nothing is moved below 0 s.
+{
+  const scene1 = model.newBoard(), scene2 = model.newBoard();
+  scene1.panels = scene1.panels.slice(0, 2); scene2.panels = scene2.panels.slice(0, 2);
+  let shots = model.mergeDirectorShots([], scene1, { storyboard: "ctx_sb1" });
+  shots = model.mergeDirectorShots(shots, scene2, { storyboard: "ctx_sb2" });
+  // Scene 2 moved in front of scene 1 in the Studio: 0..5 s, scene 1 now 5..10 s, the list order unchanged.
+  shots = shots.map((s, i) => ({ ...s, start: [5, 7.5, 0, 2.5][i], end: [7.5, 10, 2.5, 5][i] }));
+  scene1.panels.forEach((p) => { p.seconds = 1; });
+  shots = model.mergeDirectorShots(shots, scene1, { storyboard: "ctx_sb1" });
+  assert.deepEqual(shots.map((s) => [s.start, s.end]), [[0, 2.5], [2.5, 5], [5, 6], [6, 7]], "scene 2 stays, scene 1 shrinks in place");
+  // A shot added after both scenes with + Shot (end of the list) follows the scene that is resized before it.
+  shots.push({ ...shots[0], id: "added", media: [], start: 7, end: 9 });
+  scene2.panels.forEach((p) => { p.seconds = 4; });
+  shots = model.mergeDirectorShots(shots, scene2, { storyboard: "ctx_sb2" });
+  assert.deepEqual(shots.map((s) => [s.id === "added", s.start, s.end]),
+    [[false, 0, 4], [false, 4, 8], [false, 8, 9], [false, 9, 10], [true, 10, 12]]);
+  // A list that already went below 0 s is put back from 0 s by the scene that sits there.
+  shots = shots.map((s) => ({ ...s, start: s.start - 20, end: s.end - 20 }));
+  shots = model.mergeDirectorShots(shots, scene2, { storyboard: "ctx_sb2" });
+  assert.ok(shots.every((s) => s.start >= 0), shots.map((s) => s.start).join(" "));
+}
+
 // Character bar (Figurenleiste) on the sheet and PNG tEXt project roundtrip (embedBoardPng -> extractBoardPng).
 {
   const board = { ...model.newBoard(), title: "CAST TEST" };
