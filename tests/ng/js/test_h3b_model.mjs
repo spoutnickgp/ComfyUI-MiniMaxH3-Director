@@ -187,6 +187,31 @@ const model = await import("../../../js/ng/h3b_model.js");
   assert.equal(scene2.panels[1].seconds, 2.5);
 }
 
+// A copied board's shots carry its card in their ids (sb-<card>-<panel>). Once the Studio has taken the storyboard tag
+// off them, a resend must still find them by that id and update them, not append the scene a second time under the
+// same ids, which the Director refuses ("shots.shots[N].id must be nonempty and unique").
+{
+  const scene1 = model.newBoard(), scene2 = structuredClone(scene1);
+  scene1.panels = scene1.panels.slice(0, 2); scene2.panels = scene2.panels.slice(0, 2);
+  let shots = model.mergeDirectorShots([], scene1, { storyboard: "ctx_sb1" });
+  shots = model.mergeDirectorShots(shots, scene2, { storyboard: "ctx_sb2" });
+  for (const shot of shots.slice(2)) shot.media = [{ schema_version: 1, context_id: "ctx_sb2", role: "context" }];
+  shots = model.mergeDirectorShots(shots, scene2, { storyboard: "ctx_sb2" });
+  assert.equal(shots.length, 4, "the scene is updated in place, not appended again");
+  assert.equal(new Set(shots.map((s) => s.id)).size, 4);
+  assert.deepEqual(shots.slice(2).map((s) => s.media.map((m) => m.role)), [["storyboard", "context"], ["storyboard", "context"]]);
+  // A list that already holds the scene twice (as written before this fix) collapses back to one copy on resend.
+  const broken = [...shots, ...structuredClone(shots.slice(2)).map((s, i) => ({ ...s, start: 10 + 2.5 * i, end: 12.5 + 2.5 * i }))];
+  shots = model.mergeDirectorShots(broken, scene2, { storyboard: "ctx_sb2" });
+  assert.equal(shots.length, 4);
+  assert.equal(new Set(shots.map((s) => s.id)).size, 4);
+  // A third copy whose usual ids are all taken still gets ids of its own, which keep the panel id at the end.
+  const scene3 = structuredClone(scene2), taken = [`sb-ctx_sb3-${scene3.panels[0].id}`];
+  shots = model.mergeDirectorShots([...shots, { ...shots[0], id: taken[0], media: [], start: 10, end: 12 }], scene3, { storyboard: "ctx_sb3" });
+  assert.equal(new Set(shots.map((s) => s.id)).size, shots.length, "every id unique");
+  assert.ok(shots.slice(-2).every((s, i) => s.id.endsWith(`-${scene3.panels[i].id}`)));
+}
+
 // Character bar (Figurenleiste) on the sheet and PNG tEXt project roundtrip (embedBoardPng -> extractBoardPng).
 {
   const board = { ...model.newBoard(), title: "CAST TEST" };

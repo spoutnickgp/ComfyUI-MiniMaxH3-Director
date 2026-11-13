@@ -244,16 +244,24 @@ export function mergeDirectorShots(existingShots, board, ids = {}, { replaceAll 
   if (!Array.isArray(existingShots) || !existingShots.length || replaceAll) return fresh;
   const panelSet = new Set(board.panels.map((p) => `sb-${p.id}`));
   const byCard = Boolean(ids.storyboard) && existingShots.some((s) => hasCard(s, ids.storyboard));
-  const isOwned = (shot) => byCard ? hasCard(shot, ids.storyboard)
-    : panelSet.has(shot.id) && (!ids.storyboard || !anyCard(shot) || anyCard(shot) === ids.storyboard);
+  // A copied board's shots are named after its card (see claim), so they stay its own after the Studio drops their tag.
+  const named = (shot) => Boolean(ids.storyboard) && String(shot.id || "").startsWith(`sb-${ids.storyboard}-`);
+  const isOwned = (shot) => named(shot) || (byCard ? hasCard(shot, ids.storyboard)
+    : panelSet.has(shot.id) && (!ids.storyboard || !anyCard(shot) || anyCard(shot) === ids.storyboard));
   const ownedIdx = existingShots.map((s, i) => (isOwned(s) ? i : -1)).filter((i) => i >= 0);
   const taken = new Set(existingShots.filter((_, i) => !ownedIdx.includes(i)).map((s) => s.id));
+  // The first free id of the candidates, else one named after the card; the panel id stays last for the lookups by id.
+  const key = ids.storyboard || board.id;
+  const claim = (pid, ...candidates) => {
+    let id = [...candidates, `sb-${key}-${pid}`].find((c) => c && !taken.has(c));
+    for (let n = 2; !id; n += 1) if (!taken.has(`sb-${key}-${n}-${pid}`)) id = `sb-${key}-${n}-${pid}`;
+    taken.add(id);
+    return id;
+  };
   if (!ownedIdx.length) {
     const offset = round3(Math.max(0, ...existingShots.map((s) => Number(s.end) || 0)));
     const appended = fresh.map((shot, index) => {
-      const pid = board.panels[index].id;
-      const id = taken.has(shot.id) ? `sb-${ids.storyboard || board.id}-${pid}` : shot.id;
-      taken.add(id);
+      const id = claim(board.panels[index].id, shot.id);
       return { ...shot, id, start: round3(offset + shot.start), end: round3(offset + shot.end) };
     });
     return [...existingShots, ...appended];
@@ -264,9 +272,7 @@ export function mergeDirectorShots(existingShots, board, ids = {}, { replaceAll 
   const updated = fresh.map((shot, index) => {
     const pid = board.panels[index].id;
     const prev = owned.find((s) => s.id === `sb-${pid}` || String(s.id || "").endsWith(`-${pid}`)) || owned[index];
-    let id = prev?.id && !taken.has(prev.id) ? prev.id : shot.id;
-    if (taken.has(id)) id = `sb-${ids.storyboard || board.id}-${pid}`;
-    taken.add(id);
+    const id = claim(pid, prev?.id, shot.id);
     const locked = Array.isArray(prev?.locked_fields) ? prev.locked_fields : [];
     const extra = (prev?.media || []).filter((m) => !["storyboard", "first_frame", "last_frame"].includes(m.role));
     return { ...shot, id, start: round3(offset + shot.start), end: round3(offset + shot.end),
