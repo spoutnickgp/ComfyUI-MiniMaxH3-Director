@@ -13,6 +13,7 @@ from . import fields, frames, limits
 from .boundaries import align_to_shots
 from .issues import Issue, SchemaError
 from .shot_document import MediaBinding, SpokenLine
+from .shot_share import SPEAK_MIN_FRAMES, lines_here
 
 CONTINUITY_MODES = ("none", "video", "video_audio")
 
@@ -236,6 +237,24 @@ def _late_changes(shots, chunks):
     return issues
 
 
+def _early_lines(chunks):
+    """A shot's spoken lines are all said in one part (shot_share.lines_here). A shot that goes on well past that part is
+    silent there, and its later beats (an answer, a shout) are seen after their words were heard."""
+    issues, warned = [], set()
+    for chunk in chunks:
+        for shot in chunk.shots:
+            if shot.shot_index in warned or not any(line.text.strip() for line in shot.spoken) or not lines_here(shot, chunk):
+                continue
+            after = shot.shot_end_f - chunk.story_end_f
+            if after >= SPEAK_MIN_FRAMES:
+                warned.add(shot.shot_index)
+                issues.append(Issue("early_lines", "has %d spoken line(s), all said in render part %d; the shot goes on for %.1fs "
+                                    "after that part, without them. Shorten the shot or split it so each line is in the part "
+                                    "where it happens." % (sum(1 for line in shot.spoken if line.text.strip()), chunk.index + 1,
+                                                           frames.frames_to_seconds(after)), "shot %d" % shot.shot_index))
+    return issues
+
+
 def plan_chunks(project_frames, chunk_target_frames, continuity, shots=(), cuts=(), joins=(), max_frames=limits.SAMPLED_MAX_FRAMES):
     """Split `project_frames` into chunks. Returns a SequencePlan; corrections are in plan.issues.
 
@@ -268,7 +287,7 @@ def plan_chunks(project_frames, chunk_target_frames, continuity, shots=(), cuts=
                             shots=_shots_for_chunk(shots, cursor, cursor + delivered, this_head, bool(sources[index])),
                             is_last=index == len(lengths) - 1, continuation_id=sources[index]))
         cursor += delivered
-    issues = _plan_issues(project_frames, cursor, len(chunks), continuity)
+    issues = _plan_issues(project_frames, cursor, len(chunks), continuity) + _early_lines(chunks)
     if continuity.mode != "none":
         issues += _late_changes(shots, chunks)
     return SequencePlan(requested_frames=project_frames, continuity=continuity, chunks=tuple(chunks), issues=tuple(issues))

@@ -22,6 +22,7 @@
 | The same figure appears twice | a second picture of a figure needs **Belongs to** that figure |
 | A figure looks different later in a long video | use **References** mode; give the figure a character sheet (picture editor) |
 | A spoken line is missing or cut off | give the shot more time, or split the line |
+| *Lines said too early*: a line is heard over the wrong picture | all of a shot's lines are said in the render part where it starts; shorten the shot or split it so each line is in the part where it happens |
 | The voice sounds wrong | use a clean voice sample, 3–10 s, no music |
 | A song gets dull or the lips are off | **Use as: Lock** for the song; time the lyrics with Whisper |
 | A visible jump at a join | **Transition: Continue picture and sound**; the planner places joins away from new actions |
