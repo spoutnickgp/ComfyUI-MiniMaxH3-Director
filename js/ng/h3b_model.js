@@ -258,9 +258,9 @@ export function mergeDirectorShots(existingShots, board, ids = {}, { replaceAll 
     });
     return [...existingShots, ...appended];
   }
-  const first = ownedIdx[0], last = ownedIdx[ownedIdx.length - 1];
-  const offset = round3(existingShots[first].start), oldEnd = round3(existingShots[last].end);
-  const owned = ownedIdx.map((i) => existingShots[i]);
+  // By time, not by list order: the Studio adds a shot at the end of the list and a move only changes its times.
+  const owned = ownedIdx.map((i) => existingShots[i]).sort((a, b) => Number(a.start) - Number(b.start));
+  const offset = round3(Math.max(0, Number(owned[0].start) || 0)), oldEnd = round3(Math.max(...owned.map((s) => Number(s.end) || 0)));
   const updated = fresh.map((shot, index) => {
     const pid = board.panels[index].id;
     const prev = owned.find((s) => s.id === `sb-${pid}` || String(s.id || "").endsWith(`-${pid}`)) || owned[index];
@@ -275,10 +275,10 @@ export function mergeDirectorShots(existingShots, board, ids = {}, { replaceAll 
       spoken: Array.isArray(prev?.spoken) ? prev.spoken : [], locked_fields: locked, draft: prev?.draft ?? null };
   });
   const delta = round3((updated.at(-1)?.end ?? offset) - oldEnd);
-  const before = existingShots.slice(0, first).filter((_, i) => !ownedIdx.includes(i));
-  const after = existingShots.slice(first + 1).filter((_, i) => !ownedIdx.includes(first + 1 + i))
-    .map((s) => ({ ...s, start: round3(s.start + delta), end: round3(s.end + delta) }));
-  return [...before, ...updated, ...after];
+  // The shots after the scene move by its change of length; the scene starts at 0 s or later, so none go below it.
+  const others = existingShots.filter((_, i) => !ownedIdx.includes(i)).map((s) => (Number(s.start) >= oldEnd - 1e-6
+    ? { ...s, start: round3(s.start + delta), end: round3(s.end + delta) } : s));
+  return [...others, ...updated].sort((a, b) => a.start - b.start);
 }
 
 // Pulls updated panel durations and shot texts from the connected Director back into the board's panels.
