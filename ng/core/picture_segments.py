@@ -48,10 +48,16 @@ def storyboard_segments(context, chunk, texts):
     """References mode: a Storyboard picture plans the shots it lies on (viewpoint, subject placement, shot order), as
     MiniMax's guide words it: "<Picture 3> is a storyboard reference for [Shot 1] and [Shot 2]". It is no frame of the
     video; before 2026-10-12 it became a keyframe guide at each shot's start and the sketch itself was pushed into the
-    picture. A storyboard card on no shot plans the whole target video."""
+    picture. A storyboard card on no shot plans the whole target video.
+
+    A shot carried over from the part before plans nothing: its panel shows how the shot starts, the video this part
+    continues shows where it got to, and H3 told to keep both went back to the panel's framing and made the move again
+    (2026-11-14: part 4 jumped back to the close-up on the TV screen and pulled out a second time)."""
     number = _written_numbers(chunk, texts)
     planned, bound = {}, bound_media_ids(context.shots_text)
     for shot in chunk.shots:
+        if shot.carried:
+            continue
         for binding in shot.media:
             if _plans(context, binding) and shot.shot_id in number:
                 planned.setdefault(binding.context_id, {})[number[shot.shot_id]] = shot.shot_id
