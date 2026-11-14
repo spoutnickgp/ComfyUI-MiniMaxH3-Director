@@ -214,8 +214,12 @@ class ShotGuides(unittest.TestCase):
         lines = [next(l for l in c.prompt.splitlines() if l.startswith("<Picture 2> is a storyboard")) for c in compiled]
         self.assertEqual(len(lines), 3)
         self.assertTrue(lines[0].endswith("[Shot 1] is its panel 1 and [Shot 2] is its panel 2."), lines[0])
-        self.assertTrue(lines[1].endswith("[Shot 1] is its panel 2 and [Shot 2] is its panel 3."), lines[1])
-        self.assertTrue(lines[2].endswith("[Shot 1] is its panel 3 and [Shot 2] is its panel 4."), lines[2])
+        # In parts 2 and 3, [Shot 1] is carried over: the video the part continues gives its framing, not its panel, which
+        # shows how the shot starts (H3 went back to the panel's framing and made the move again, 2026-11-14).
+        self.assertTrue(lines[1].endswith("a storyboard reference for [Shot 2], defining its viewpoint, subject placement, "
+                                          "and shot order. [Shot 2] is its panel 3."), lines[1])
+        self.assertTrue(lines[2].endswith("[Shot 2] is its panel 4."), lines[2])
+        self.assertTrue(all("[Shot 1]" not in line for line in lines[1:]))
         three = [shot("p%d" % n, (n - 1) * 3, n * 3, [("sb", "storyboard")]) for n in range(1, 4)]
         prompt = plan(three, items, 9, 10).compiled[0].prompt
         self.assertIn("for [Shot 1], [Shot 2] and [Shot 3], defining their viewpoint", prompt)
