@@ -13,6 +13,9 @@ In a shot, **+ Spoken line** adds a line that is said **word for word**:
 - **Language**: the language the line is spoken in.
 - **Delivery**: *says*, *sings*, *whispers*, *shouts* or *murmurs*. A sung line needs *sings*.
 - Several lines in one shot are said in their order. Short lines (one sentence per 2–3 seconds) come out best.
+- A shot's lines are all said in the render part where the shot starts. Where the shot goes on in the next part,
+  the words of its text that make someone speak (*speaks in a soft voice*, *answers*, *goes on*) are left out there,
+  so H3 does not make up new words for them.
 
 ## A voice for a figure
 
