@@ -8,15 +8,15 @@ import unittest
 from _pack import module
 
 ctx, project, chunks = module("ng.core.context"), module("ng.core.project"), module("ng.core.chunks")
-shot_share = module("ng.core.shot_share")
+shot_share, bridge = module("ng.core.shot_share"), module("ng.core.legacy_bridge")
 LUNA = ctx.ContextItem("luna", "Luna", "image", "luna.png", usage=("reference",), content=("character",), description="A woman.")
 
 
-def plan(second_start):
+def plan(second_start, text="@Luna stops."):
     line = {"schema_version": 1, "text": "The moon is bright tonight.", "speaker_id": "luna", "voice": "a calm young woman",
             "language": "English", "delivery": "says"}
     shots = [{"id": "a", "start": 0, "end": second_start, "text": "@Luna walks.", "media": [{"schema_version": 1, "context_id": "luna", "role": "context"}]},
-             {"id": "b", "start": second_start, "end": 15, "text": "@Luna stops.", "spoken": [line],
+             {"id": "b", "start": second_start, "end": 15, "text": text, "spoken": [line],
               "media": [{"schema_version": 1, "context_id": "luna", "role": "context"}]}]
     context = ctx.DirectorContext(shots_text=json.dumps({"format": "h3-director-shots", "schema_version": 1, "shots": shots}),
                                   items=(LUNA,), project_seconds=15, width=1280, height=704, music="N/A", soundscape="Quiet.")
@@ -45,6 +45,25 @@ class SpokenPart(unittest.TestCase):
         result = plan(3)
         self.assertIn("bright tonight", result.compiled[0].prompt)
         self.assertNotIn("bright tonight", result.compiled[1].prompt)
+
+    def test_the_part_without_the_lines_does_not_show_the_shot_speaking(self):
+        # 75 s ref2va project (2026-11): the carried tail kept "she speaks in a soft voice" without its <d> line, and H3
+        # made up words for it
+        result = plan(3, "@Luna stops at the window and speaks in a calm voice.")
+        self.assertEqual(len(result.compiled), 2)
+        self.assertIn("speaks in a calm voice", result.compiled[0].prompt)
+        self.assertNotIn("speaks", result.compiled[1].prompt)
+        self.assertIn("stops at the window", result.compiled[1].prompt)
+
+    def test_a_shot_whose_lines_move_to_the_next_part_does_not_speak_before_them(self):
+        late = chunks.ChunkShot(1, 200, 238, "@Luna stops and speaks in a calm voice.", carried=False, continues=True,
+                                shot_start_f=168, shot_end_f=360,
+                                spoken=(chunks.SpokenLine("The moon is bright tonight.", speaker_id="luna"),))
+        context = ctx.DirectorContext(items=(LUNA,), shots_text=json.dumps({"format": "h3-director-shots", "schema_version": 1, "shots": []}))
+        text = bridge._shot_text(late, lambda t: t.replace("@Luna", "@ref1"), context=context, chunk=chunks.Chunk(0, 0, 175, 0, shots=(late,)))
+        self.assertNotIn("speaks", text)
+        self.assertNotIn("bright tonight", text)
+        self.assertIn("@ref1 stops", text)
 
 
 if __name__ == "__main__":

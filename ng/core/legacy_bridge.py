@@ -15,6 +15,7 @@ from .context_options import retention_note
 from .issues import Issue
 from .subjects import subject_groups
 from . import shot_share
+from .shot_speech import without_lines
 from .shot_bindings import spoken_text, voices_heard
 from .shot_document import has_shots, read_document, read_look
 from .picture_segments import anchor_segments, storyboard_segments
@@ -279,7 +280,8 @@ CONTINUE_SCENE = "Continue the same scene and action from the preceding video, p
 
 def _shot_text(shot, substitute, automatic=False, context=None, chunk=None):
     """A shot that began in an earlier chunk keeps its action but not its spoken lines: those belong to where the shot starts
-    (or to the next part when it starts in a part's last two seconds, shot_share.lines_here). Nor its camera move: the part before already made it, and each part read "the camera pushes in" as a new push, so a
+    (or to the next part when it starts in a part's last two seconds, shot_share.lines_here), nor its speaking actions
+    there (shot_speech). Nor its camera move: the part before already made it, and each part read "the camera pushes in" as a new push, so a
     20 s shot over three parts pushed in three times and lost its look (AUDIT-010, measured 2026-10-11).
 
     A shot over several parts gives each part only the action of its own share of the shot's time (ng.core.shot_share)."""
@@ -293,7 +295,7 @@ def _shot_text(shot, substitute, automatic=False, context=None, chunk=None):
             return shared
         text = "\n".join([shared] + spoken)
     if not shot_share.lines_here(shot, chunk):
-        text = "\n".join(line for line in text.splitlines() if not plan.DIALOGUE_RE.match(line.strip()))
+        text = without_lines(text, plan.DIALOGUE_RE)
     if not shot.carried:
         text = shot_share.with_effect(text, shot.effect, plan.DIALOGUE_RE)
     if shot.carried:
