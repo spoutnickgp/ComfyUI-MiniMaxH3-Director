@@ -133,6 +133,18 @@ function placeField(S, actions, shot) {
       oninput: (event) => actions.setShot(shot.id, { place_view: event.target.value }, false) }) : null);
 }
 
+// "Render part: New part (cut)" (user 2026-11-16): the shot opens a render part with no pin, so the shot before does not
+// run on into it (core/project._part_edges). A Place already opens a part; the first shot always does.
+const PART_HINT = "Auto: the plan splits the video where it fits. New part (cut): a render part starts at this shot, fresh, "
+  + "without frames of the shot before. Use it for a hard cut. The start may move by up to 0.33 s onto H3's frame grid.";
+function partField(S, actions, shot) {
+  if (shot.start <= 0 || (shot.place_from && !shot.part_start)) return null;
+  return h("div", { style: { display: "flex", flexDirection: "column", gap: "4px" } },
+    h("div", { class: "h3s-row" }, h("span", { class: "h3s-lbl" }, "Render part"), tip(PART_HINT)),
+    select([["", "Auto"], ["cut", "New part (cut)"]], shot.part_start === "cut" ? "cut" : "",
+      (value) => actions.setShot(shot.id, { part_start: value || undefined }), { "aria-label": "Render part at this shot" }));
+}
+
 // The official H3 effect embeddings found in models/embeddings (minimaxh3_*). Measured 2026-10-20 (M12): an effect takes
 // over the camera; it is written after the shot's action where the shot starts (core/shot_share.with_effect).
 const EFFECT_HINT = "An official MiniMax H3 effect such as Bullet time. It takes over the camera of this shot, in the render part where the shot starts.";
@@ -180,6 +192,7 @@ function shotPanel(S, actions, shot) {
       media.length ? null : h("span", { class: "h3s-muted", style: { fontSize: "13px" } }, "None: a text-only shot. Click Content above or drag it onto the shot."),
       media.map(([binding, entry]) => bindingRow(S, actions, shot, binding, entry))),
     placeField(S, actions, shot),
+    partField(S, actions, shot),
     effectField(S, actions, shot),
     h("div", { style: { display: "flex", flexDirection: "column", gap: "8px" } }, h("span", { class: "h3s-lbl" }, "Spoken (optional, used word for word, in this order)"),
       spokenLines(S, actions, shot, showAdd),

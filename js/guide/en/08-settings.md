@@ -60,6 +60,7 @@ Every field of the H3 Director in one place, from top to bottom. How to work wit
 | **Seconds after shot start** | for a *Keyframe*: when the picture is reached |
 | **Place** | *Its own place* or *Like Shot N* (reuse an earlier shot's place) |
 | **Picture** | for *Like Shot N*: *Without people*, *As rendered (1 s in)* or *From another view …* with a camera text |
+| **Render part** | *Auto*, or *New part (cut)*: a render part starts at this shot, without frames of the shot before |
 | **Effect** | an official H3 camera effect such as *Bullet time* (only when its files are installed) |
 | **+ Spoken line** | a line said word for word: speaker (or *Narrator*), language, delivery (*says*, *sings*, *whispers*, *shouts*, *murmurs*), text |
 | **In:** | the render parts the shot lies in |
