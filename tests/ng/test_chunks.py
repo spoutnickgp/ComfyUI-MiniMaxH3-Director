@@ -7,6 +7,7 @@ frames = module("ng.core.frames")
 limits = module("ng.core.limits")
 shots = module("ng.core.shots")
 issues = module("ng.core.issues")
+shot_document = module("ng.core.shot_document")
 
 VIDEO = chunks.ContinuityPlan("video_audio", 22, 24)
 NONE = chunks.ContinuityPlan("none")
@@ -126,6 +127,25 @@ class ShotMapping(unittest.TestCase):
     def test_no_shots_gives_empty_lists(self):
         plan = chunks.plan_chunks(480, 240, VIDEO, ())
         self.assertTrue(all(c.shots == () for c in plan.chunks))
+
+
+class EarlyLines(unittest.TestCase):
+    """All of a shot's lines are said in one part: a shot with lines that runs on well past it gets a warning."""
+    spoken = (shot_document.SpokenLine("Why?"), shot_document.SpokenLine("Because."))
+
+    def plan(self, shot_seconds, spoken):
+        story = (shots.Shot(1, 0, 24, "a"), shots.Shot(2, 24, 24 + shot_seconds * 24, "b", spoken=spoken))
+        return chunks.plan_chunks(story[-1].end_f, 8 * 24, VIDEO, story)
+
+    def test_long_shot_with_lines_is_flagged_once(self):
+        plan = self.plan(15, self.spoken)
+        found = [i for i in plan.issues if i.code == "early_lines"]
+        self.assertEqual([(i.ref, "2 spoken line(s)" in i.text, "render part 1" in i.text) for i in found], [("shot 2", True, True)])
+
+    def test_shot_inside_one_part_or_without_lines_is_not_flagged(self):
+        self.assertNotIn("early_lines", codes(self.plan(5, self.spoken)))
+        self.assertNotIn("early_lines", codes(self.plan(15, ())))
+        self.assertNotIn("early_lines", codes(self.plan(15, (shot_document.SpokenLine("  "),))))
 
 
 class Persistence(unittest.TestCase):
