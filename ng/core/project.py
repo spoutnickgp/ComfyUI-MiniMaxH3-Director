@@ -181,19 +181,30 @@ def _edge(previous, previous_head, wanted):
     return min((low, low + step), key=lambda f: (abs(f - wanted), f))
 
 
-def _place_edge(shot, start, previous, previous_head, until):
-    """The cut at which a shot in the place of an earlier one opens its own part, or None; with the issue to report."""
-    join = _edge(previous, previous_head, start)
+def _cut_marks(shots_text):
+    """The shots the user starts a render part with, unpinned (field `part_start` "cut", Studio "Render part: New part")."""
+    return {record["id"] for record in read_document(shots_text) or () if record.get("part_start") == "cut"}
+
+
+def _place_edge(shot, start, previous, previous_head, until, place_targets):
+    """The cut at which a shot in the place of an earlier one, or one marked to start a part, opens its own part, or None
+    (a place that gets none goes into `place_targets.dropped`); with the issue to report."""
+    join, ref, place = _edge(previous, previous_head, start), "shot %d" % shot.index, shot.id in place_targets
     if join - previous < _shortest(previous_head) or until - join < _shortest(0):
-        return None, Issue("place_too_close", "starts too close to the previous render part or the end for a part of its own, "
-                           "which the place picture of an earlier shot needs; it is not used.", "shot %d" % shot.index)
+        if place:
+            place_targets.dropped.add(shot.id)
+            return None, Issue("place_too_close", "starts too close to the previous render part or the end for a part of its own, "
+                               "which the place picture of an earlier shot needs; it is not used.", ref)
+        return None, Issue("part_start_too_close", "is set to start a new render part, but starts too close to the previous part "
+                           "or the end for a part of its own; it stays in the running part.", ref)
     if join == start:
         return join, None
-    return join, Issue("place_moved", "starts at %.2fs instead of %.2fs so that it opens a render part of its own for its place "
-                       "picture." % (frames.frames_to_seconds(join), frames.frames_to_seconds(shot.start_f)), "shot %d" % shot.index)
+    why = "for its place picture" if place else "as set"
+    return join, Issue("place_moved" if place else "part_start_moved", "starts at %.2fs instead of %.2fs so that it opens a render "
+                       "part of its own %s; parts start on H3's grid." % (frames.frames_to_seconds(join), frames.frames_to_seconds(shot.start_f), why), ref)
 
 
-def _part_edges(context, shots, total, head, place_targets=()):
+def _part_edges(context, shots, total, head, place_targets=(), cut_marks=()):
     """Source openings and FL2VA picture edges: (cuts, joins, moved shot starts, moved keyframes, issues).
 
     A shot opening on its own First frame picture starts an unpinned part (cut): inside a pinned part H3 took such a
@@ -202,7 +213,8 @@ def _part_edges(context, shots, total, head, place_targets=()):
     shot runs on. Parts start on H3's grid, so a shot start or keyframe moves to the nearest grid frame.
     A shot in the place of an earlier shot (`place_targets`) is a cut back to that place: its Place picture comes from the
     render of an earlier part (core/places.py); pinned, H3 kept the market square running (2026-10-18). One that cannot get
-    a part of its own goes into `place_targets.dropped`."""
+    a part of its own goes into `place_targets.dropped`. A shot in `cut_marks` opens an unpinned part the same way, without
+    a picture: the user's choice for a hard cut, so the shot before does not run on into it."""
     initial = continuation.initial_opening(context, shots)
     cuts, joins, moved, moved_keys, issues = ({0: initial} if initial else {}), [], {}, {}, []
     previous, previous_head = 0, initial.head_frames if initial else 0
@@ -227,12 +239,10 @@ def _part_edges(context, shots, total, head, place_targets=()):
                     moved[shot.id] = start = cut
                     issues.append(Issue("opening_moved", "starts at %.2fs instead of %.2fs so that its source opens a render part."
                                         % (frames.frames_to_seconds(cut), frames.frames_to_seconds(shot.start_f)), "shot %d" % shot.index))
-        elif start > 0 and shot.id in place_targets:
-            cut, issue = _place_edge(shot, start, previous, previous_head, until)
+        elif start > 0 and (shot.id in place_targets or shot.id in cut_marks):
+            cut, issue = _place_edge(shot, start, previous, previous_head, until, place_targets)
             issues += [issue] if issue else []
-            if cut is None:
-                place_targets.dropped.add(shot.id)
-            else:
+            if cut is not None:
                 cuts[cut] = ChunkOpening()
                 previous, previous_head = cut, 0
                 if cut != start:
@@ -308,10 +318,10 @@ def plan_project(context: DirectorContext, chunk_seconds, continuity: Continuity
         shots, shot_issues = parse_shots(context.shots_text, total)
         chosen, place_issues = places.links(context.shots_text, shots)
         issues = issues + place_issues
-        targets = _Targets(chosen)
+        targets, marks = _Targets(chosen), _cut_marks(context.shots_text)
         if (continuity.head and decide_mode(context) == "fl2va") or continuation.initial_opening(context, shots) or any(
-                continuation.shot_source(context, shot) for shot in shots) or chosen:
-            cuts, joins, moved, moved_keys, edge_issues = _part_edges(context, shots, total, continuity.head, targets)
+                continuation.shot_source(context, shot) for shot in shots) or chosen or marks:
+            cuts, joins, moved, moved_keys, edge_issues = _part_edges(context, shots, total, continuity.head, targets, marks)
             issues = issues + edge_issues
         else:
             moved, moved_keys = {}, {}

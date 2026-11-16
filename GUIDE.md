@@ -936,8 +936,9 @@ and Redo.
 - **Audio lanes**: a sound on a lane runs on its own, across shots and render parts (a song is not restarted per shot).
   **+ Audio lane** adds one; move and trim the clip with the mouse.
 - **Control**: control videos and masks (Workflows 7 and 8).
-- **Render parts**: how the Director cuts the video into H3 runs, each in its own colour. You do not edit them; they follow
-  the shots, the duration and the render-part length in the Settings.
+- **Render parts**: how the Director cuts the video into H3 runs, each in its own colour. They follow the shots, the
+  duration and the render-part length in the Settings; a shot set to **Render part: New part (cut)** starts one of its own.
+  A part with a thick left edge starts fresh, without frames of the part before (a cut).
 
 ### The right side
 
@@ -948,7 +949,8 @@ item:
 
 - **A shot**: start and end, **What happens?** (the action and the camera, `@Name` for a card), **Content in this shot**
   with the role of each card, and the **Spoken** lines. **AI: improve text** suggests a better shot text. **Place**
-  reuses the place of an earlier shot (chapter *Pictures*); **Effect** adds an official H3 camera effect such as *Bullet
+  reuses the place of an earlier shot (chapter *Pictures*); **Render part** *New part (cut)* starts a render part at this
+  shot without frames of the shot before, for a hard cut (the start may move up to 0.33 s onto H3's frame grid); **Effect** adds an official H3 camera effect such as *Bullet
   time*, when its files are installed.
 - **An audio clip**: its time on the story, **From second in file** and how H3 uses it (*Lock*, *Copy*, *Reference*,
   chapter *Voices, dialogue and songs*).
@@ -1232,6 +1234,7 @@ Every field of the H3 Director in one place, from top to bottom. How to work wit
 | **Seconds after shot start** | for a *Keyframe*: when the picture is reached |
 | **Place** | *Its own place* or *Like Shot N* (reuse an earlier shot's place) |
 | **Picture** | for *Like Shot N*: *Without people*, *As rendered (1 s in)* or *From another view …* with a camera text |
+| **Render part** | *Auto*, or *New part (cut)*: a render part starts at this shot, without frames of the shot before |
 | **Effect** | an official H3 camera effect such as *Bullet time* (only when its files are installed) |
 | **LoRAs** | LoRAs from `models/loras`, each with a strength, switched on in every render part that renders the shot (also for the frames of a neighbouring shot in the same part); trigger words go into the shot's text |
 | **+ Spoken line** | a line said word for word: speaker (or *Narrator*), language, delivery (*says*, *sings*, *whispers*, *shouts*, *murmurs*), text |
