@@ -1,4 +1,5 @@
 """NG Chunk Conditioning and NG Collect: the nodes inside and after the loop."""
+import dataclasses
 import json
 import logging
 import os
@@ -77,6 +78,8 @@ class NGChunkConditioning(io.ComfyNode):
                                  tooltip="Disable to keep the connected model's existing H3 sampling shifts."),
                 io.Combo.Input("resize_method", options=list(RESIZE_METHODS), default="crop", optional=True, advanced=True,
                                tooltip="How a first or last frame picture is fitted to the video size."),
+                io.String.Input("resume_settings", optional=True, advanced=True,
+                                tooltip="Set for a part rendered alone (Part N only): its head comes from the kept render parts."),
             ],
             outputs=[io.Model.Output(display_name="model"), io.Conditioning.Output(display_name="positive"), io.Latent.Output(display_name="latent"),
                      io.String.Output(display_name="prompt")],
@@ -96,11 +99,15 @@ class NGChunkConditioning(io.ComfyNode):
 
     @classmethod
     def execute(cls, chunk, clip, vae, audio_vae=None, model_fl2va=None, model_ref2va=None, previous=None,
-                shift_video=12.0, shift_audio=3.0, ref_image_size="match", apply_sigma_shift=True, resize_method="crop"):
+                shift_video=12.0, shift_audio=3.0, ref_image_size="match", apply_sigma_shift=True, resize_method="crop",
+                resume_settings=None):
         job = _job(chunk)
-        if job.chunk.head_frames and not job.chunk.continuation_id:
-            if previous is None:
-                raise ValueError("Chunk %d needs the previous full AV latent; connect Start Loop's current_iteration_value to previous." % (job.index + 1))
+        pinned = job.chunk.head_frames and not job.chunk.continuation_id
+        if resume_settings:
+            previous = _kept_head(job, json.loads(resume_settings))
+        elif pinned and previous is None:
+            raise ValueError("Chunk %d needs the previous full AV latent; connect Start Loop's current_iteration_value to previous." % (job.index + 1))
+        if pinned and previous is not None:
             latents.validate_chunk(previous, job.project.plan.chunks[job.index - 1].sampled_frames, "Previous chunk")
         mm = core()
         wanted, other = (model_ref2va, model_fl2va) if job.compiled.mode == "ref2va" else (model_fl2va, model_ref2va)
@@ -121,6 +128,38 @@ class NGChunkConditioning(io.ComfyNode):
         model = shot_loras.apply(model, job)
         model = audio_locks.bind_source(model, job, audio_vae)
         return io.NodeOutput(model, built.positive, built.latent, job.compiled.prompt)
+
+
+def _kept_head(job, settings):
+    """The head of a part rendered alone (adapters/resume.head_source); None renders a continued part without one, at the
+    same length, its first frames thrown away like any head."""
+    kind, key = resume.head_source(job, settings)
+    if kind == "none":
+        log.warning("[H3 Director] render part %d alone: no kept render of part %d, so it starts without its head", job.index + 1, job.index)
+    elif kind == "earlier" and key:
+        log.warning("[H3 Director] render part %d alone: its head comes from an earlier run of part %d", job.index + 1, job.index)
+    return resume.load(key) if key else None
+
+
+class NGCollectPart(io.ComfyNode):
+    """ "Part N only": the one part decoded, its head cut off, its sound restored, as the video."""
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id="NGCollectPart", display_name="NG Collect Part", category=CATEGORY + "/Technical", is_dev_only=True,
+            inputs=[io.Latent.Input("latent"), NGChunk.Input("chunk"), io.Vae.Input("vae"), io.Vae.Input("audio_vae")],
+            outputs=[io.Image.Output(display_name="images"), io.Audio.Output(display_name="audio"), io.String.Output(display_name="warnings")])
+
+    @classmethod
+    def execute(cls, latent, chunk, vae, audio_vae):
+        job = _job(chunk)
+        only = dataclasses.replace(job.project.plan, chunks=(job.chunk,))
+        frames, sound, issues = collect.collect_chunks(
+            [latent], only, lambda video: _decode_video(vae, video), lambda audio: audio_nodes().vae_decode_audio(audio_vae, {"samples": audio}),
+            restore_audio=lambda index, wave, rate: audio_locks.restore_waveform(job, wave, rate),
+            restore_picture=lambda index, known, delivered: continuation_join.smooth(job, known, delivered))
+        note = "Part %d only, for a quick look; render all parts for the video." % (job.index + 1)
+        return io.NodeOutput(frames, sound, "\n".join([note] + [str(i) for i in issues]))
 
 
 class NGCollect(io.ComfyNode):
@@ -198,4 +237,4 @@ def _decode_video(vae, video):
     return frames.reshape(-1, *frames.shape[-3:]) if frames.ndim == 5 else frames
 
 
-NODES = [NGChunkInfo, NGChunkConditioning, NGCollect, NGCollectVideo]
+NODES = [NGChunkInfo, NGChunkConditioning, NGCollect, NGCollectPart, NGCollectVideo]

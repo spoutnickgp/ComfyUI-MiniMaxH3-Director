@@ -14,6 +14,7 @@ Every field of the H3 Director in one place, from top to bottom. How to work wit
 | **Show prompts** | opens *Prompts per render part* at the bottom |
 | **Gear** | opens the Settings window (below) |
 | **Generate** | queues the workflow, the same as ComfyUI's Run |
+| **All parts / Part N only** | the whole video, or one render part alone for a quick look |
 
 ## Prompt
 

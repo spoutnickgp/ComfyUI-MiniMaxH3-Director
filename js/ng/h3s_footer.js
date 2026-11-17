@@ -35,6 +35,20 @@ function durationField(S, actions) {
       onclick: () => set(length) }, `= ${song.name}`) : null));
 }
 
+// "Part N only" (render_part, user 2026-11-17): H3 Render Sequence renders one part alone, for a quick look at a part
+// without rendering the parts before it. A continued part takes its head from the kept parts (adapters/resume.head_source).
+// It is kept beside Generate, so a forgotten "Part 4" is seen before the next full render.
+const PART_HINT = "All parts: the video. Part N: only that render part, for a quick look. A continued part starts from the kept "
+  + "render of the part before (Resume), from an earlier run of it, or without it; such a part is not kept for the video.";
+export function partPicker(S, actions) {
+  const count = S.plan?.chunks.length || 0, chosen = Number(S.values.render_part) || 0;
+  if ((!count && !chosen) || S.values.output === "images") return null;     // Pictures render every shot as before
+  const options = [["0", "All parts"], ...Array.from({ length: count }, (_, n) => [String(n + 1), `Part ${n + 1} only`])];
+  if (chosen > count) options.push([String(chosen), `Part ${chosen} only (not in the plan)`]);
+  return select(options, chosen, (value) => actions.setWidget("render_part", Number(value)),
+    { "aria-label": "Render all parts or one", title: PART_HINT, class: chosen ? "h3s-in h3s-warn" : "h3s-in", style: { width: "auto" } });
+}
+
 // The page keeps only what a first video needs; everything else is behind the gear (h3s_settings.js).
 export function footerView(S, actions) {
   const v = S.values;

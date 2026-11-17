@@ -95,7 +95,8 @@ def delivered_pictures(videos, plan, decode_video, *, restore_picture=None):
     final = plan.chunks[-1].index
     for pieces, run in _joined_runs(videos, plan):
         total = sum(p.shape[2] for p in pieces)
-        origin = run[0].story_start_f - (run[0].head_frames if run[0].continuation_id else 0)
+        # a run's first latent holds its head: a source's frames, or a pinned head when one part is rendered alone
+        origin = run[0].story_start_f - run[0].head_frames
         for chunk in run:
             first = (chunk.story_start_f - origin) // VAE_CLIP_FRAMES
             last = (chunk.story_end_f - origin - 1) // VAE_CLIP_FRAMES

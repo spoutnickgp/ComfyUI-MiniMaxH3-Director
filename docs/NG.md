@@ -226,6 +226,11 @@ This is the compiler's real output, refreshed live while you edit.
   Files older than 14 days are removed. The models are not part of the key: after swapping a checkpoint, empty the folder.
   The Studio's **Resume** switch (under Turbo) turns it off. Its box **Delete the kept parts when the video is done** (on by
   default) removes a video's parts once it is put together, so they do not fill the disk unseen.
+- **Part N only** (`render_part`, the Studio's menu left of Generate): H3 Render Sequence renders one part alone, without a
+  loop. A continued part takes its head from the resume folder: the previous part under the current plan, else that part as
+  an earlier run rendered it from the same plan of its own (a `.link` file named after that plan points to it), else none
+  (rendered at the same length, its first frames thrown away). Only a part with its real head is kept under its key, so a
+  quick look never becomes part of the final video. A part with a Place picture needs that picture from an earlier render.
 - **Control video (experimental)**: **H3 Control Video** between Director Output's MODEL and the guider steers each part with a
   pose, depth or edge video (MiniMax H3 Fun ControlNet-Union via ComfyUI's `ModelPatchLoader` and its apply node), or with a mask
   and the source video behind it. The videos run on the story timeline at 24 fps; each part gets its own window, head included.

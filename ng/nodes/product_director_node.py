@@ -63,7 +63,11 @@ class NGH3Director(io.ComfyNode):
                                                 tooltip="Video, or one picture per shot (text to image, or a First frame picture changed as the shot says)."),
                                  io.Boolean.Input("spectrum", default=False, optional=True, advanced=True,
                                                   tooltip="With Turbo off: the Spectrum pack forecasts some sampling steps (about a third "
-                                                          "faster at 20 steps). Needs ComfyUI-Spectrum-MiniMax-H3 installed.")],
+                                                          "faster at 20 steps). Needs ComfyUI-Spectrum-MiniMax-H3 installed."),
+                                 io.Int.Input("render_part", default=0, min=0, max=999, optional=True, advanced=True,
+                                              tooltip="0: render every part. N: H3 Render Sequence renders part N alone, for a quick look. "
+                                                      "A continued part takes its head from the kept parts: the real one, the one of an "
+                                                      "earlier run, or none. Such a part is not kept for Resume.")],
                          outputs=[NGResult.Output(display_name="result"), NGChunk.Output(display_name="chunks", is_output_list=True)])
 
     @classmethod

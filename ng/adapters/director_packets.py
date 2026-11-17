@@ -8,7 +8,7 @@ from .ai_provider import NativeAIProvider
 from ..core.project import ChunkJob, jobs
 from ..core.turbo_profiles import part_settings
 from ..core import control_timing
-from .render_graph import render_sequence, still_sequence, turbo_models
+from .render_graph import part_render, render_sequence, still_sequence, turbo_models
 
 
 @dataclass(frozen=True)
@@ -48,6 +48,7 @@ class RenderSettings:
     models: str = ""            # {purpose: file} from the Studio's Models menu (adapters/model_files.py)
     output: str = "video"       # video | images: one picture per shot (core/stills.py)
     spectrum: bool = False      # Spectrum's step forecast on the sampled model, Turbo off only (adapters/render_graph.py)
+    render_part: int = 0        # 0: every part; N: part N alone, for a quick look (adapters/render_graph.part_render)
 
     def values(self):
         return {name: getattr(self, name) for name in self.__dataclass_fields__}
@@ -105,6 +106,14 @@ def render_project(result):
         inputs["preview_vae"] = result.inputs.preview_vae
     if result.inputs.model_patch is not None:
         inputs["model_patch"] = result.inputs.model_patch
+    only = result.settings.render_part
+    if only and result.project.output != "images":
+        parts = jobs(result.project)
+        if only > len(parts):
+            raise ValueError("Render: Part %d only, but the plan has %d render part(s). Choose another part, or All parts."
+                             % (only, len(parts)))
+        del inputs["chunks"]
+        return part_render(inputs, result.settings.values(), parts[only - 1])
     sequence = still_sequence if result.project.output == "images" else render_sequence
     expanded, outputs = sequence(inputs, result.settings.values())
     return {**graph.finalize(), **expanded}, outputs
