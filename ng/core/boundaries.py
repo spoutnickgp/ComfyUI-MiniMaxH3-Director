@@ -26,18 +26,34 @@ def _fits(lengths, k, delta, head, first_head=0, maximum=limits.SAMPLED_MAX_FRAM
     return low_a <= lengths[k] + delta <= high_a and low_b <= lengths[k + 1] - delta <= high_b
 
 
+def _near(starts, boundary):
+    """The shot starts too close to a boundary: in its part's last two seconds, or in the held stretch after it."""
+    return [t for t in starts if -END_LEAD < t - boundary < limits.LATE_CHANGE_FRAMES]
+
+
+def _shifts(lengths, k, boundary, late):
+    """The whole-step shifts to try, nearest first (earlier first on a tie): the two that clear the first late shot, then
+    every other step the two parts can give up. With short shots close together, the nearest shift can land the boundary
+    by the next shot (75 s project, 2026-11-16: a boundary moved off one shot start ended 4 frames before the one before)."""
+    near = _candidates(boundary, late)
+    steps = range(-(lengths[k] // STEP) * STEP, lengths[k + 1] + 1, STEP)
+    return near + sorted((d for d in steps if d and d not in near), key=lambda d: (abs(d), d))
+
+
 def align_to_shots(lengths, head, shots, first_head=0, maximum=limits.SAMPLED_MAX_FRAMES):
-    """Returns new delivered lengths with the same total. Boundaries that are fine are left alone."""
+    """Returns new delivered lengths with the same total. Boundaries that are fine are left alone. A boundary moves to the
+    nearest place clear of every shot start; where there is none, it moves off the first one, as before."""
     lengths = list(lengths)
     starts = [s.start_f for s in shots if s.start_f > 0]
     for k in range(len(lengths) - 1):
         boundary = sum(lengths[:k + 1])
-        late = [t for t in starts if -END_LEAD < t - boundary < limits.LATE_CHANGE_FRAMES]
+        late = _near(starts, boundary)
         if not late:
             continue
-        for delta in _candidates(boundary, late[0]):
-            if _fits(lengths, k, delta, head, first_head, maximum):
-                lengths[k] += delta
-                lengths[k + 1] -= delta
-                break
+        fitting = [d for d in _shifts(lengths, k, boundary, late[0]) if _fits(lengths, k, d, head, first_head, maximum)]
+        clear = [d for d in fitting if not _near(starts, boundary + d)]
+        fallback = [d for d in fitting if d in _candidates(boundary, late[0])]
+        delta = (clear or fallback or [0])[0]
+        lengths[k] += delta
+        lengths[k + 1] -= delta
     return lengths
