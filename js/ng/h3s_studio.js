@@ -12,7 +12,7 @@ import { timelineEditor } from "./h3s_edits.js";
 import { bindTimelineKeys } from "./h3s_keys.js";
 import { updateStudioPage } from "./h3s_focus.js";
 import { sideView, loadEffects } from "./h3s_side.js";
-import { footerView } from "./h3s_footer.js";
+import { footerView, partPicker } from "./h3s_footer.js";
 import { settingsView, manualPromptAlert, loadModels } from "./h3s_settings.js";
 import { drawerView } from "./h3s_prompts.js";
 import { studioAI, basis as aiBasis } from "./h3s_ai.js";
@@ -426,17 +426,17 @@ export function openStudio(node, app, api, host = null) {
     return h("header", { class: "h3s-head" }, back,
       ...(full ? [h("span", { style: { width: "1px", height: "24px", background: "#2A3342" } }),
         h("span", { class: "h3s-title" }, "H3 Director"), h("span", { class: "h3s-muted" }, "Studio")] : []),
-      h("span", { class: "h3s-grow" }), status,
+      h("span", { class: "h3s-grow" }), status, partPicker(S, actions),
       h("span", { class: "h3s-row", style: { gap: "6px" }, title: "Green when an H3 AI Loader is connected to the Context Connector" },
         h("span", { class: "h3s-swatch", style: { background: S.ai ? "#5BD08A" : "#6B7383", borderRadius: "50%" } }), S.ai ? "AI connected" : "AI off"),
       h("button", { class: "h3s-btn", onclick: () => actions.toggle("promptOpen") }, icon("doc"), S.promptOpen ? "Hide prompts" : "Show prompts"),
       h("button", { class: "h3s-btn", onclick: () => actions.toggle("settingsOpen"), title: "All settings", "aria-label": "Settings" }, icon("gear")),
       h("button", { class: "h3s-btn go", disabled: !ready || Boolean(S.planError), title: S.planError ? `The plan failed: ${S.planError}` : ready ? "Queues the connected workflow in ComfyUI" :
-        "Connect Director Output to H3 Render Sequence or a sampler and a video output", onclick: generate }, icon("play"), "Generate"));
+        "Connect Director Output to H3 Render Sequence or a sampler and a video output", onclick: generate }, icon("play"), S.values.render_part ? `Generate part ${S.values.render_part}` : "Generate"));
   }
   function generate() {
     app.queuePrompt(0, 1);
-    flash(`Queued: ${S.plan ? S.plan.chunks.length : "?"} render part(s). Progress at the top, result in the Save Video node.`);
+    flash(`Queued: ${S.values.render_part ? `part ${S.values.render_part} only` : `${S.plan ? S.plan.chunks.length : "?"} render part(s)`}. Progress at the top, result in the Save Video node.`);
     render();
   }
 

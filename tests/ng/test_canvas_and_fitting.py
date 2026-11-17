@@ -84,8 +84,24 @@ class Settings(unittest.TestCase):
         self.assertEqual((inputs["resize_method"], inputs["ref_image_size"]), ("crop", "match"))
         names = [item.id for item in self.nodes["NGH3Director"].GET_SCHEMA().inputs]
         # new inputs go last, so older workflows keep their saved widget order
-        self.assertEqual(names[-10:], ["resize_method", "ref_image_size", "resume", "resume_delete_done", "control_strength", "control_start", "control_end",
-                                       "models", "output", "spectrum"])
+        self.assertEqual(names[-11:], ["resize_method", "ref_image_size", "resume", "resume_delete_done", "control_strength", "control_start", "control_end",
+                                       "models", "output", "spectrum", "render_part"])
+
+    def test_render_part_renders_one_part_without_the_loop(self):
+        render = self.nodes["NGProjectRender"].execute
+        types = lambda expand: [v["class_type"] for v in expand.values()]
+        self.assertIn("StartLoop", types(render(sequence=self.result()).expand))
+        one = render(sequence=self.result(render_part=2)).expand
+        self.assertNotIn("StartLoop", types(one))
+        self.assertIn("NGCollectPart", types(one))
+        inputs = self.conditioning(one)
+        self.assertNotIn("previous", inputs)
+        self.assertIn("resume_settings", inputs, "its head comes from the kept parts")
+        self.assertEqual(inputs["chunk"].index, 1)
+        kept = next(v for v in one.values() if v["class_type"] == "NGResumeChunk")["inputs"]
+        self.assertTrue(kept["one_part"], "kept only with its real head")
+        with self.assertRaisesRegex(ValueError, "Part 9 only"):
+            render(sequence=self.result(render_part=9))
 
     def test_resume_is_on_by_default_and_can_be_switched_off(self):
         types = lambda result: {v["class_type"] for v in self.nodes["NGProjectRender"].execute(sequence=result).expand.values()}

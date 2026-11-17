@@ -97,22 +97,29 @@ class NGResumeChunk(io.ComfyNode):
     def define_schema(cls):
         return io.Schema(node_id="NGResumeChunk", display_name="NG Resume Chunk", category=CATEGORY + "/Technical", is_dev_only=True,
                          inputs=[NGChunk.Input("chunk"), io.String.Input("settings"),
-                                 io.Latent.Input("sampled", lazy=True, optional=True)],
+                                 io.Latent.Input("sampled", lazy=True, optional=True),
+                                 io.Boolean.Input("one_part", default=False, optional=True,
+                                                  tooltip="A part rendered alone: kept only when it had its real head.")],
                          outputs=[io.Latent.Output()])
 
     @classmethod
-    def check_lazy_status(cls, chunk, settings, sampled=None):
+    def check_lazy_status(cls, chunk, settings, sampled=None, one_part=False):
         job = chunk[0] if isinstance(chunk, list) else chunk
         return [] if resume.has(resume.part_key(job, part_settings(job.compiled.mode, json.loads(settings)))) else ["sampled"]
 
     @classmethod
-    def execute(cls, chunk, settings, sampled=None):
+    def execute(cls, chunk, settings, sampled=None, one_part=False):
         job = chunk[0] if isinstance(chunk, list) else chunk
-        key = resume.part_key(job, part_settings(job.compiled.mode, json.loads(settings)))
+        wanted = part_settings(job.compiled.mode, json.loads(settings))
+        key = resume.part_key(job, wanted)
         if resume.has(key):
             logging.info("[H3 Director] render part %d comes from %s (resume)", job.index + 1, resume.folder())
             return io.NodeOutput(resume.load(key))
+        if one_part and resume.head_source(job, json.loads(settings))[0] not in ("own", "real"):
+            logging.info("[H3 Director] render part %d was rendered alone without its real head; it is not kept for Resume", job.index + 1)
+            return io.NodeOutput(sampled)
         resume.save(key, sampled)
+        resume.link(job, wanted, key)
         return io.NodeOutput(sampled)
 
 

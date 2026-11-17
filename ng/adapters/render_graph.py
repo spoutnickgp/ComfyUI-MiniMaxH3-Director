@@ -27,11 +27,13 @@ SPECTRUM = dict(enabled=True, blend_weight=0.5, degree=1, ridge_lambda=0.1, wind
                 tail_actual_steps=1, max_history=64, debug=False)
 
 
-def render_sequence(inputs, settings):
-    graph = GraphBuilder()
-    inputs = turbo_models(graph, inputs, settings)
-    start = graph.node("StartLoop", "start", mode="List", **{"mode.list": inputs["chunks"]}, cache_iterations=False)
-    conditioning = graph.node("NGChunkConditioning", "conditioning", chunk=start.out(3), previous=start.out(4),
+def _sampled_part(graph, inputs, settings, chunk, previous=None):
+    """One part's conditioning, model chain, noise and sampler: (sampled latent, the settings its resume key is made of).
+    `chunk` and `previous` are the loop's list item and current value, or one part and nothing for "Part N only"
+    (render_part), whose conditioning then takes the head the resume folder has (adapters/resume.head_for)."""
+    sampled_with = json.dumps({key: settings.get(key) for key in RESUME_SETTINGS}, sort_keys=True)
+    head = {"previous": previous} if previous is not None else {"resume_settings": sampled_with}
+    conditioning = graph.node("NGChunkConditioning", "conditioning", chunk=chunk, **head,
                               clip=inputs["clip"], vae=inputs["vae"], audio_vae=inputs["audio_vae"],
                               shift_video=settings["shift_video"], shift_audio=settings["shift_audio"],
                               ref_image_size=settings.get("ref_image_size", "match"), resize_method=settings.get("resize_method", "crop"))
@@ -40,7 +42,7 @@ def render_sequence(inputs, settings):
             conditioning.set_input(name, inputs[name])
     model = conditioning.out(0)
     if inputs.get("model_patch") is not None:
-        model = graph.node("NGControlChunk", "control", model=model, chunk=start.out(3), vae=inputs["vae"],
+        model = graph.node("NGControlChunk", "control", model=model, chunk=chunk, vae=inputs["vae"],
                            model_patch=inputs["model_patch"], strength=settings.get("control_strength", 1.0),
                            start_percent=settings.get("control_start", 0.0), end_percent=settings.get("control_end", 1.0)).out(0)
     if settings.get("spectrum") and not settings.get("turbo"):
@@ -52,19 +54,28 @@ def render_sequence(inputs, settings):
         if inputs.get("preview_vae") is not None:
             preview.set_input("vae", inputs["preview_vae"])
         model = preview.out(0)
-    noise = graph.node("NGChunkNoise", "noise", chunk=start.out(3), seed=settings["seed"])
-    sampled_with = json.dumps({key: settings.get(key) for key in RESUME_SETTINGS}, sort_keys=True)
+    noise = graph.node("NGChunkNoise", "noise", chunk=chunk, seed=settings["seed"])
     # per part: a known turbo LoRA on the part's model brings its own steps, sampler and scheduler (core/turbo_profiles.py)
-    sampling = graph.node("NGChunkSampling", "sampling", chunk=start.out(3), model=model, settings=sampled_with)
+    sampling = graph.node("NGChunkSampling", "sampling", chunk=chunk, model=model, settings=sampled_with)
     guider = graph.node("BasicGuider", "guider", model=model, conditioning=conditioning.out(1))
     sample = graph.node("SamplerCustomAdvanced", "sample", noise=noise.out(0), guider=guider.out(0),
                        sampler=sampling.out(0), sigmas=sampling.out(1), latent_image=conditioning.out(2))
     part = sample.out(0)
     if settings.get("resume", True):
-        # a finished part is kept on disk and reused after a crash (adapters/resume.py)
-        part = graph.node("NGResumeChunk", "resume", chunk=start.out(3), sampled=part, settings=sampled_with).out(0)
+        # a finished part is kept on disk and reused after a crash (adapters/resume.py); a part rendered alone without
+        # its real head is not kept as one (one_part)
+        one = {} if previous is not None else {"one_part": True}
+        part = graph.node("NGResumeChunk", "resume", chunk=chunk, sampled=part, settings=sampled_with, **one).out(0)
     # pictures of this part that later shots take their place from (core/places.py); a pass-through for every other part
-    part = graph.node("NGPlaceStill", "place", chunk=start.out(3), sampled=part, vae=inputs["vae"], models=settings.get("models", "")).out(0)
+    part = graph.node("NGPlaceStill", "place", chunk=chunk, sampled=part, vae=inputs["vae"], models=settings.get("models", "")).out(0)
+    return part, sampled_with
+
+
+def render_sequence(inputs, settings):
+    graph = GraphBuilder()
+    inputs = turbo_models(graph, inputs, settings)
+    start = graph.node("StartLoop", "start", mode="List", **{"mode.list": inputs["chunks"]}, cache_iterations=False)
+    part, sampled_with = _sampled_part(graph, inputs, settings, start.out(3), start.out(4))
     end = graph.node("EndLoop", "end", output_value=part, next_iteration_value=part, accumulate=True)
     collect = graph.node("NGCollect", "collect", latents=end.out(0), chunks=inputs["chunks"],
                          vae=inputs["vae"], audio_vae=inputs["audio_vae"])
@@ -75,6 +86,17 @@ def render_sequence(inputs, settings):
     # Expanded graphs do not pass through the top-level loop validator again.
     validate_loops(expanded, [video.id, collect.id], expanded.keys(), [start.id], [end.id])
     return expanded, (video.out(0), collect.out(0), collect.out(1), collect.out(2))
+
+
+def part_render(inputs, settings, job):
+    """ "Part N only" (render_part): one part sampled on its own for a quick look, no loop. Its head comes from the
+    resume folder: the real previous part, or that part from an earlier run, or none (adapters/resume.head_for)."""
+    graph = GraphBuilder()
+    inputs = turbo_models(graph, inputs, settings)
+    part, _ = _sampled_part(graph, inputs, settings, job)
+    collect = graph.node("NGCollectPart", "collect", latent=part, chunk=job, vae=inputs["vae"], audio_vae=inputs["audio_vae"])
+    video = graph.node("CreateVideo", "video", images=collect.out(0), audio=collect.out(1), fps=24.0)
+    return graph.finalize(), (video.out(0), collect.out(0), collect.out(1), collect.out(2))
 
 
 def still_sequence(inputs, settings):

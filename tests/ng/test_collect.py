@@ -167,6 +167,20 @@ class Collect(unittest.TestCase):
         self.assertEqual(frames.shape[0], expected.shape[0])
         self.assertTrue(torch.equal(frames, expected))
 
+    def test_a_pinned_part_collected_alone_starts_after_its_own_head(self):
+        # "Part N only" (render_part): the part's latent starts with its head, with no earlier part to join it to
+        from dataclasses import replace
+        plan = chunks.plan_chunks(900, 240, chunks.ContinuityPlan("video_audio", 22))
+        part = plan.chunks[1]
+        self.assertTrue(part.head_frames)
+        steps = pin.steps_for_frames(part.sampled_frames)
+        video = torch.arange(steps, dtype=torch.float32).view(1, 1, steps, 1, 1).expand(1, 24, steps, 2, 2).clone()
+        latent = {"samples": NestedTensor((video, torch.zeros(1, 32, 2, round(part.sampled_frames / 24.0 * 40))))}
+        frames, _, _ = collect.collect_chunks([latent], replace(plan, chunks=(part,)), decode_video,
+                                              decode_audio_factory({part.index: part.sampled_frames}))
+        expected = decode_video(video)[part.head_frames:part.head_frames + part.delivered_frames]
+        self.assertTrue(torch.equal(frames, expected))
+
     def test_wrong_number_of_chunks_or_frames_is_refused(self):
         plan = self.plan()
         sizes = {c.index: c.sampled_frames for c in plan.chunks}

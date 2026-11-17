@@ -5,7 +5,12 @@ A part's key covers what it was made from: its own plan (chunk, prompt, referenc
 settings, and the keys of every part before it, because a continued part is pinned to the one before. Changing part 5
 renders part 5 and everything after it again; parts 1 to 4 come from disk. The models themselves are not in the key: after
 swapping a checkpoint, delete the folder. The folder is under ComfyUI's output folder, because ComfyUI empties its temp
-folder at every start, which is exactly when a resume is needed."""
+folder at every start, which is exactly when a resume is needed.
+
+"Part N only" (render_part) renders one part alone. A continued part takes its head from here (head_source): the previous
+part under the current plan, or else that part as an earlier run rendered it from the same plan of its own, found through a
+small link file named after that own plan; or no head. Only a part with its real head is kept under its key, so a quick
+look never becomes part of the final video."""
 import hashlib
 import json
 import os
@@ -77,6 +82,47 @@ def _path(key):
     return os.path.join(folder(), key + ".pt")
 
 
+def _link_path(job, settings):
+    """The link file of the part's own plan (no earlier parts in it), which names the key it was last kept under."""
+    base = {k: v for k, v in settings.items() if not k.startswith("control_")}
+    own = hashlib.sha256(json.dumps([base, _own(job, settings)], sort_keys=True, default=str).encode()).hexdigest()
+    return os.path.join(folder(), own[:32] + ".link")
+
+
+def link(job, settings, key):
+    with open(_link_path(job, settings), "w", encoding="utf8") as handle:
+        handle.write(key)
+
+
+def _linked(job, settings):
+    try:
+        with open(_link_path(job, settings), encoding="utf8") as handle:
+            return handle.read().strip()
+    except OSError:
+        return ""
+
+
+def head_source(job, settings):
+    """What a part rendered alone takes from the parts before it: ("own", None) for nothing; ("real", key) the previous
+    part under the current plan; ("earlier", key) that part from an earlier run of the same plan of its own; ("none",
+    None) nothing kept. A Place picture is from an earlier render too, so it makes any part "earlier"; one that is not
+    there stops the render."""
+    placed = [ref for ref in job.compiled.refs if is_place(ref.ctx_id)]
+    if any(_file(ref.source) is None for ref in placed):
+        raise ValueError("Part %d only: it uses a Place picture, which the render of an earlier part makes and which this "
+                         "plan does not have yet. Render all parts once, or set the shot to its own place while you try "
+                         "this part." % (job.index + 1))
+    if not job.chunk.head_frames or job.chunk.continuation_id:
+        return ("earlier" if placed else "own"), None
+    before = jobs(job.project)[job.index - 1]
+    wanted = part_settings(before.compiled.mode, settings)
+    key = part_key(before, wanted)
+    if has(key):
+        return ("earlier" if placed else "real"), key
+    linked = _linked(before, wanted)
+    return ("earlier", linked) if linked and has(linked) else ("none", None)
+
+
 def has(key):
     return os.path.isfile(_path(key))
 
@@ -96,11 +142,14 @@ def save(key, latent):
 
 
 def forget(chunks, settings):
-    """The whole video is put together: its parts are no longer needed for a resume."""
+    """The whole video is put together: its parts (and their link files) are no longer needed for a resume."""
     for job in chunks:
-        key = part_key(job, part_settings(job.compiled.mode, settings))
+        wanted = part_settings(job.compiled.mode, settings)
+        key = part_key(job, wanted)
         if has(key):
             os.remove(_path(key))
+        if _linked(job, wanted) == key:
+            os.remove(_link_path(job, wanted))
 
 
 def _prune():
@@ -108,5 +157,5 @@ def _prune():
     limit = time.time() - KEEP_DAYS * 86400
     for name in os.listdir(folder()):
         path = os.path.join(folder(), name)
-        if name.endswith(".pt") and os.path.getmtime(path) < limit:
+        if name.endswith((".pt", ".link")) and os.path.getmtime(path) < limit:
             os.remove(path)
