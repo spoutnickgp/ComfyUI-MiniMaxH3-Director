@@ -124,10 +124,15 @@ def add_cards(context, places, shots):
     labels = {shot.id: shot.index for shot in shots}
     items, have = list(context.items), {item.id for item in context.items}
     data = json.loads(context.shots_text)
+    shared = {place.source_id for place in places if sum(p.source_id == place.source_id for p in places) > 1}
     for place in places:
         if place.context_id not in have:
             have.add(place.context_id)
-            items.append(ContextItem(id=place.context_id, name="Place of Shot %d" % labels.get(place.source_id, 0), media="image",
+            # card names must be unique: two shots in the place of one shot each get their own card, named for both shots
+            name = "Place of Shot %d" % labels.get(place.source_id, 0)
+            if place.source_id in shared:
+                name += " for Shot %d" % labels.get(place.target_id, 0)
+            items.append(ContextItem(id=place.context_id, name=name, media="image",
                                      source=place.source, content=("location",), usage=("reference",), preserve="high",
                                      description=DESCRIPTION))
         for record in data["shots"]:
