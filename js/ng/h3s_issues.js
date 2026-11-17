@@ -13,6 +13,7 @@ const TITLES = {
   canvas_default: "Default size", audio_short: "Audio too short", audio_roles: "Several audio roles", audio_dulling: "Audio gets duller",
   audio_clip_unknown: "Audio clip without audio Content", audio_clip_clipped: "Audio clip shortened", audio_clip_after_end: "Audio clip after project end", audio_clip_past_file: "Audio clip past file end",
   asset_relation_unavailable: "Assignment not possible",
+  part_start_moved: "Shot moved onto H3 grid", part_start_too_close: "New render part not possible",
 };
 
 export function issueLine(issue) {
