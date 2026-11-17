@@ -17,11 +17,11 @@ if HAVE_COMFY:
 SETTINGS = {"seed": 7, "steps": 4}
 
 
-def plan(texts):
+def plan(texts, continuity="video_audio"):
     records = [{"id": "s%d" % n, "start": 10 * n, "end": 10 * n + 10, "text": text, "media": []} for n, text in enumerate(texts)]
     document = json.dumps({"format": "h3-director-shots", "schema_version": 1, "shots": records})
     result = project.plan_project(ctx.DirectorContext(shots_text=document, project_seconds=10 * len(texts)), 10,
-                                  chunks.ContinuityPlan("video_audio"))
+                                  chunks.ContinuityPlan(continuity))
     return project.jobs(result)
 
 
@@ -55,6 +55,13 @@ class Keys(unittest.TestCase):
         self.assertTrue(all(x != y for x, y in zip(ka, kc)), "every later part is pinned to the changed one")
         self.assertEqual(ka, keys(plan(["One.", "Two.", "Three."])), "the same plan gives the same keys")
         self.assertNotEqual(ka[0], resume.part_key(plan(["One.", "Two.", "Three."])[0], {**SETTINGS, "seed": 8}))
+
+    def test_a_part_that_starts_fresh_keeps_its_key_when_an_earlier_part_changes(self):
+        keys = lambda js: [resume.part_key(j, SETTINGS) for j in js]
+        ka = keys(plan(["One.", "Two.", "Three."], "none"))
+        kb = keys(plan(["One changed.", "Two.", "Three."], "none"))
+        self.assertNotEqual(ka[0], kb[0])
+        self.assertEqual(ka[1:], kb[1:], "unpinned parts take nothing from the parts before them (ChunkJob.chain_start)")
 
 
 @unittest.skipUnless(HAVE_COMFY, "ComfyUI is not importable")

@@ -218,7 +218,8 @@ This is the compiler's real output, refreshed live while you edit.
   and reference video frames to the Qwen size of H3's released processor and cuts a reference video's soundtrack to the frames
   the stock node keeps (`minimax_refprep.py`).
 - **Resume after a crash**: Render Sequence keeps every finished render part's raw latent in `output/h3-director-resume`. Queue the
-  same plan again and the finished parts come from disk without sampling; a changed part and every part after it render again.
+  same plan again and the finished parts come from disk without sampling; a changed part and the parts after it render again,
+  up to the next part that starts fresh (no pin, as at a **Render part: New part (cut)** shot, and no Place picture).
   A shot change usually lies a few frames before the end of a part (H3's frame grid; a cut right after a join would come about
   2.5 s late), so that part already shows the new shot's first frames: editing a shot's text renders the part before it again too.
   Files older than 14 days are removed. The models are not part of the key: after swapping a checkpoint, empty the folder.
