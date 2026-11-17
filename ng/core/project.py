@@ -108,6 +108,17 @@ class ChunkJob:
     def compiled(self):
         return self.project.compiled[self.index]
 
+    @property
+    def chain_start(self):
+        """The first part this part's render depends on (adapters/resume.py keys it over those parts). A part with no
+        pinned head and no Place picture takes nothing from the parts before it: it starts its own chain. A continued
+        part depends on the part before it, and so on back to such a part or the first one."""
+        for index in range(self.index, 0, -1):
+            chunk, compiled = self.project.plan.chunks[index], self.project.compiled[index]
+            if not chunk.head_frames and not chunk.continuation_id and not any(places.is_place(r.ctx_id) for r in compiled.refs):
+                return index
+        return 0
+
 
 def jobs(project: ProjectPlan):
     return [ChunkJob(project, n) for n in range(len(project.plan.chunks))]

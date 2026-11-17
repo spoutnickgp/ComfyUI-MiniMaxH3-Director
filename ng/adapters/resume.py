@@ -2,8 +2,9 @@
 queued again, so a run that died after hours only samples the parts it had not finished.
 
 A part's key covers what it was made from: its own plan (chunk, prompt, references and the files behind them), the render
-settings, and the keys of every part before it, because a continued part is pinned to the one before. Changing part 5
-renders part 5 and everything after it again; parts 1 to 4 come from disk. The models themselves are not in the key: after
+settings, and the parts before it back to the last one that starts fresh (ChunkJob.chain_start), because a continued part
+is pinned to the one before. Changing part 5 renders part 5 and the parts after it again, up to the next part with no
+pin and no Place picture; parts 1 to 4 come from disk. The models themselves are not in the key: after
 swapping a checkpoint, delete the folder. The folder is under ComfyUI's output folder, because ComfyUI empties its temp
 folder at every start, which is exactly when a resume is needed."""
 import hashlib
@@ -65,10 +66,10 @@ def _own(job, settings):
 
 
 def part_key(job, settings):
-    """Hex key of this part, chained over every part before it."""
+    """Hex key of this part, chained over the parts it depends on (ChunkJob.chain_start)."""
     base = {k: v for k, v in settings.items() if not k.startswith("control_")}
     key = hashlib.sha256(json.dumps(base, sort_keys=True, default=str).encode()).hexdigest()
-    for earlier in jobs(job.project)[:job.index + 1]:
+    for earlier in jobs(job.project)[job.chain_start:job.index + 1]:
         key = hashlib.sha256((key + json.dumps(_own(earlier, settings), sort_keys=True, default=str)).encode()).hexdigest()
     return key[:32]
 
