@@ -100,6 +100,21 @@ class Planning(unittest.TestCase):
         both = project.plan_project(context, 0, chunks.ContinuityPlan("video_audio")).places
         self.assertEqual(len({p.context_id for p in both}), 2)
 
+    def test_two_shots_in_the_same_place_get_distinct_card_names(self):
+        # both cards were "Place of Shot 1", and reading the plan back (AI render prompts) stopped on "name used twice"
+        result = plan(seconds=(5, 5, 5, 5), items=())
+        doc = json.loads(result.context.shots_text)
+        doc["shots"][2]["place_from"] = "s1"
+        fresh = ctx.DirectorContext(shots_text=json.dumps(doc), project_seconds=20, mode="ref2va", music="N/A", soundscape="Quiet.",
+                                    width=1024, height=576)
+        planned = project.plan_project(fresh, 0, chunks.ContinuityPlan("video_audio")).context
+        names = sorted(item.name for item in planned.items)
+        self.assertEqual(names, ["Place of Shot 1 for Shot 3", "Place of Shot 1 for Shot 4"])
+        ctx.DirectorContext.from_dict(planned.to_dict())
+
+    def test_a_place_used_once_keeps_its_short_name(self):
+        self.assertEqual([item.name for item in plan(items=()).context.items], ["Place of Shot 1"])
+
     def test_the_picture_lies_inside_the_earlier_shot(self):
         result = plan(seconds=(1, 5, 5))
         (place,) = result.places
