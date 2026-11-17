@@ -85,6 +85,26 @@ class Disk(unittest.TestCase):
             self.assertFalse(resume.has(resume.part_key(done[0], SETTINGS)))
             self.assertTrue(resume.has(resume.part_key(other[0], SETTINGS)), "another project's part stays")
 
+    def test_a_part_rendered_alone_takes_the_head_that_is_kept(self):
+        # "Part N only" (render_part): the real previous part, else that part from an earlier run, else no head
+        with tempfile.TemporaryDirectory() as root, mock.patch.object(resume.folder_paths, "get_output_directory", return_value=root):
+            latent = {"samples": NestedTensor((torch.rand(1, 24, 2, 4, 4), torch.rand(1, 32, 2, 10)))}
+            jobs = plan(["One.", "Two."])
+            first, second = jobs
+            self.assertEqual(resume.head_source(first, SETTINGS), ("own", None), "the first part has no head")
+            self.assertEqual(resume.head_source(second, SETTINGS), ("none", None))
+            wanted = resume.part_settings(first.compiled.mode, SETTINGS)
+            resume.save("earlier", latent)
+            resume.link(first, wanted, "earlier")
+            self.assertEqual(resume.head_source(second, SETTINGS), ("earlier", "earlier"))
+            key = resume.part_key(first, wanted)
+            resume.save(key, latent)
+            resume.link(first, wanted, key)
+            self.assertEqual(resume.head_source(second, SETTINGS), ("real", key))
+            resume.forget(jobs, SETTINGS)
+            self.assertEqual([n for n in os.listdir(resume.folder()) if n.endswith(".link")], [], "forget takes the link with the part")
+            self.assertTrue(resume.has("earlier"), "a part of another run stays until it is old")
+
 
 if __name__ == "__main__":
     unittest.main()

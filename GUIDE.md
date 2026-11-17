@@ -915,6 +915,10 @@ The H3 Director node **is** the Studio: everything is edited inside the node and
 - **Show prompts** opens *Prompts per render part* at the bottom.
 - The **gear** opens the Settings (chapter *Settings*).
 - **Generate** queues the workflow, the same as ComfyUI's Run.
+- **All parts / Part N only**, left of Generate: *Part N only* renders that one render part, for a quick look while you
+  try a shot (H3 Render Sequence only). A continued part starts from the kept render of the part before (Resume), from an
+  earlier run of it, or without it; a part made without its real start is not kept for the video. Set it back to *All
+  parts* for the video; Generate then says *Generate part N* while one part is chosen.
 
 ### Prompt, Look and Content
 
@@ -1183,6 +1187,7 @@ Every field of the H3 Director in one place, from top to bottom. How to work wit
 | **Show prompts** | opens *Prompts per render part* at the bottom |
 | **Gear** | opens the Settings window (below) |
 | **Generate** | queues the workflow, the same as ComfyUI's Run |
+| **All parts / Part N only** | the whole video, or one render part alone for a quick look |
 
 ### Prompt
 
